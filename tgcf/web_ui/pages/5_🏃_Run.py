@@ -73,7 +73,7 @@ if check_password(st):
             CONFIG.pid = 0
             write_config(CONFIG)
             time.sleep(1)
-            st.experimental_rerun()
+            st.rerun()
 
         stop = st.button("Stop", type="primary")
         if stop:
@@ -100,14 +100,14 @@ if check_password(st):
         write_config(CONFIG)
         time.sleep(2)
 
-        st.experimental_rerun()
+        st.rerun()
 
     try:
         lines = st.slider(
             "Lines of logs to show", min_value=100, max_value=1000, step=100
         )
         temp_logs = "logs_n_lines.txt"
-        os.system(f"rm {temp_logs}")
+        os.system(f"rm -f {temp_logs}")
         with open("logs.txt", "r") as file:
             pass
 

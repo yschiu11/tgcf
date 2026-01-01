@@ -141,7 +141,7 @@ if check_password(st):
                 - Write every replacement in a new line.
                 - The original text then **a colon `:`** and then **a space** and then the new text.
                 - Its recommended to use **single quotes**. Quotes are must when your string contain spaces or special characters.
-                - Double quotes wont work if your regex has the character: `\` .
+                - Double quotes won't work if your regex has the character: `\\` .
                     ```
                     'orginal': 'new'
 
