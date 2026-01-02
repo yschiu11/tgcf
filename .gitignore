@@ -9,7 +9,7 @@ foo.bar
 t.ipynb
 tgcf_external.py
 t.yml
-test.py
+test*
 tgcf.config.json
 *.txt
 todo
