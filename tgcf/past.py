@@ -7,7 +7,6 @@
 import asyncio
 import logging
 import time
-from typing import List
 
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError
@@ -28,7 +27,7 @@ from tgcf.utils import (
 async def process_buffered_messages(
     client: TelegramClient,
     album_buffer: AlbumBuffer,
-    destinations: List[int]
+    destinations: list[int]
 ) -> None:
     """Process and forward messages from the buffer.
 

@@ -27,7 +27,7 @@ _album_buffers: Dict[int, AlbumBuffer] = {}
 _flush_tasks: Dict[int, asyncio.Task] = {}
 
 
-async def _flush_album(chat_id: int, client: TelegramClient, destinations: list) -> None:
+async def _flush_album(chat_id: int, client: TelegramClient, destinations: list[int]) -> None:
     """Flush the buffered album for a specific chat after timeout."""
     buffer = _album_buffers.get(chat_id)
     if buffer and not buffer.is_empty():
@@ -47,7 +47,7 @@ async def _flush_album(chat_id: int, client: TelegramClient, destinations: list)
 def _schedule_album_flush(
     chat_id: int,
     client: TelegramClient,
-    destinations: list,
+    destinations: list[int],
     timeout: float = 0.5
 ) -> None:
     """Schedule or reschedule the album flush timeout for a chat.
@@ -68,7 +68,7 @@ def _schedule_album_flush(
             await asyncio.sleep(timeout)
             await _flush_album(chat_id, client, destinations)
         except asyncio.CancelledError:
-            pass
+            logging.debug(f"Album flush task cancelled for chat {chat_id}")
 
     _flush_tasks[chat_id] = asyncio.create_task(_timeout_wrapper())
 
@@ -110,6 +110,9 @@ async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
 
     # Check if we need to flush the current buffer due to group ID change
     if buffer.should_flush(message.grouped_id):
+        # Cancel pending flush task to prevent duplicate flush
+        if chat_id in _flush_tasks:
+            _flush_tasks[chat_id].cancel()
         # Flush existing album before processing new message
         await _flush_album(chat_id, event.client, dest)
 

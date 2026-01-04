@@ -6,7 +6,7 @@ import platform
 import re
 import sys
 from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+from typing import TYPE_CHECKING, Optional
 
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
@@ -104,7 +104,7 @@ class AlbumBuffer:
     """Manages buffering and detection of media albums (grouped messages)."""
 
     def __init__(self):
-        self.messages: List["TgcfMessage"] = []
+        self.messages: list["TgcfMessage"] = []
         self.current_group_id: Optional[int] = None
 
     def add_message(self, tm: "TgcfMessage") -> None:
@@ -142,7 +142,7 @@ class AlbumBuffer:
         self.messages.clear()
         self.current_group_id = None
 
-    def get_messages(self) -> List["TgcfMessage"]:
+    def get_messages(self) -> list["TgcfMessage"]:
         """Get all buffered messages."""
         return self.messages
 
@@ -150,7 +150,7 @@ class AlbumBuffer:
 async def forward_album(
     client: TelegramClient,
     album: AlbumBuffer,
-    destinations: List[int]
+    destinations: list[int]
 ) -> None:
     """Forward an entire album to destinations.
 
@@ -188,7 +188,7 @@ async def forward_album(
 
 async def forward_single_message(
     tm: "TgcfMessage",
-    destinations: List[int]
+    destinations: list[int]
 ) -> None:
     """Forward a single message to destinations.
 
@@ -208,7 +208,7 @@ async def forward_single_message(
 
 async def handle_reply_to(
     tm: "TgcfMessage",
-    destinations: List[int]
+    destinations: list[int]
 ) -> None:
     """Set up reply_to for forwarded message if original was a reply."""
     if not tm.message.is_reply:
