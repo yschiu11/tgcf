@@ -1,12 +1,11 @@
 """The module responsible for operating tgcf in live mode."""
 
+import asyncio
 import logging
-import os
 import sys
-from typing import Union
+from typing import Dict, Union
 
 from telethon import TelegramClient, events, functions, types
-from telethon.sessions import StringSession
 from telethon.tl.custom.message import Message
 
 from tgcf import config, const
@@ -14,11 +13,68 @@ from tgcf import storage as st
 from tgcf.bot import get_events
 from tgcf.config import CONFIG, get_SESSION
 from tgcf.plugins import apply_plugins, load_async_plugins
-from tgcf.utils import clean_session_files, send_message
+from tgcf.utils import (
+    clean_session_files,
+    send_message,
+    AlbumBuffer,
+    forward_album,
+    forward_single_message,
+    handle_reply_to,
+)
+
+# Per-chat album buffers and flush tasks for managing concurrent albums
+_album_buffers: Dict[int, AlbumBuffer] = {}
+_flush_tasks: Dict[int, asyncio.Task] = {}
+
+
+async def _flush_album(chat_id: int, client: TelegramClient, destinations: list) -> None:
+    """Flush the buffered album for a specific chat after timeout."""
+    buffer = _album_buffers.get(chat_id)
+    if buffer and not buffer.is_empty():
+        if buffer.is_album():
+            await forward_album(client, buffer, destinations)
+        else:
+            tm = buffer.get_messages()[0]
+            await handle_reply_to(tm, destinations)
+            await forward_single_message(tm, destinations)
+        buffer.clear()
+
+    # Clean up the flush task
+    if chat_id in _flush_tasks:
+        del _flush_tasks[chat_id]
+
+
+def _schedule_album_flush(
+    chat_id: int,
+    client: TelegramClient,
+    destinations: list,
+    timeout: float = 0.5
+) -> None:
+    """Schedule or reschedule the album flush timeout for a chat.
+
+    Args:
+        chat_id: Source chat ID
+        client: Telegram client for forwarding
+        destinations: List of destination chat IDs
+        timeout: Seconds to wait before flushing (default 0.5s)
+    """
+    # Cancel existing flush task if any
+    if chat_id in _flush_tasks:
+        _flush_tasks[chat_id].cancel()
+
+    # Schedule new flush task
+    async def _timeout_wrapper():
+        try:
+            await asyncio.sleep(timeout)
+            await _flush_album(chat_id, client, destinations)
+        except asyncio.CancelledError:
+            pass
+
+    _flush_tasks[chat_id] = asyncio.create_task(_timeout_wrapper())
 
 
 async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
-    """Process new incoming messages."""
+    """Process new incoming messages with album buffering support."""
     chat_id = event.chat_id
 
     if chat_id not in config.from_to:
@@ -46,13 +102,34 @@ async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
         r_event = st.DummyEvent(chat_id, event.reply_to_msg_id)
         r_event_uid = st.EventUid(r_event)
 
-    st.stored[event_uid] = {}
-    for d in dest:
+    # Initialize buffer for this chat if needed
+    if chat_id not in _album_buffers:
+        _album_buffers[chat_id] = AlbumBuffer()
+
+    buffer = _album_buffers[chat_id]
+
+    # Check if we need to flush the current buffer due to group ID change
+    if buffer.should_flush(message.grouped_id):
+        # Flush existing album before processing new message
+        await _flush_album(chat_id, event.client, dest)
+
+    # Add message to buffer
+    if message.grouped_id:
+        # This message is part of an album, buffer it
+        # Pre-create storage entry so edit/delete handlers can find it
+        st.stored[event_uid] = {}
+        # Set reply_to before buffering
         if event.is_reply and r_event_uid in st.stored:
-            tm.reply_to = st.stored.get(r_event_uid).get(d)
-        fwded_msg = await send_message(d, tm)
-        st.stored[event_uid].update({d: fwded_msg})
-    tm.clear()
+            tm.reply_to = st.stored.get(r_event_uid).get(dest[0]) if dest else None
+        buffer.add_message(tm)
+        # Schedule flush after timeout in case no more messages arrive
+        _schedule_album_flush(chat_id, event.client, dest)
+    else:
+        # Standalone message, forward immediately
+        st.stored[event_uid] = {}
+        await handle_reply_to(tm, dest)
+        await forward_single_message(tm, dest)
+        tm.clear()
 
 
 async def edited_message_handler(event) -> None:
