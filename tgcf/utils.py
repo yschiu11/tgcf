@@ -6,7 +6,7 @@ import platform
 import re
 import sys
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
@@ -18,6 +18,8 @@ from tgcf.plugin_models import STYLE_CODES
 
 if TYPE_CHECKING:
     from tgcf.plugins import TgcfMessage
+
+from tgcf import storage as st
 
 
 def platform_info():
@@ -96,3 +98,129 @@ def clean_session_files():
     for item in os.listdir():
         if item.endswith(".session") or item.endswith(".session-journal"):
             os.remove(item)
+
+
+class AlbumBuffer:
+    """Manages buffering and detection of media albums (grouped messages)."""
+
+    def __init__(self):
+        self.messages: List["TgcfMessage"] = []
+        self.current_group_id: Optional[int] = None
+
+    def add_message(self, tm: "TgcfMessage") -> None:
+        """Add a message to the current album buffer."""
+        self.messages.append(tm)
+        self.current_group_id = tm.message.grouped_id
+
+    def should_flush(self, next_grouped_id: Optional[int]) -> bool:
+        """Determine if the current album should be forwarded.
+
+        Returns True when:
+        - Buffer has messages AND
+        - Next message has different grouped_id (or no grouped_id)
+        """
+        if not self.messages:
+            return False
+
+        if self.current_group_id is None:
+            return False
+
+        return next_grouped_id != self.current_group_id
+
+    def is_album(self) -> bool:
+        """Check if buffer contains multiple messages (true album)."""
+        return len(self.messages) > 1
+
+    def is_empty(self) -> bool:
+        """Check if buffer is empty."""
+        return len(self.messages) == 0
+
+    def clear(self) -> None:
+        """Clear all buffered messages and group ID."""
+        for tm in self.messages:
+            tm.clear()
+        self.messages.clear()
+        self.current_group_id = None
+
+    def get_messages(self) -> List["TgcfMessage"]:
+        """Get all buffered messages."""
+        return self.messages
+
+
+async def forward_album(
+    client: TelegramClient,
+    album: AlbumBuffer,
+    destinations: List[int]
+) -> None:
+    """Forward an entire album to destinations.
+
+    Uses native Telegram forward to preserve album structure.
+    Note: Plugin modifications are NOT applied to albums.
+    """
+    messages = album.get_messages()
+    if not messages:
+        return
+
+    source_chat_id = messages[0].message.chat_id
+    message_ids = [tm.message.id for tm in messages]
+
+    for dest in destinations:
+        try:
+            # Forward entire album as a batch
+            forwarded = await client.forward_messages(
+                dest, message_ids, source_chat_id
+            )
+
+            # Ensure forwarded is a list
+            if not isinstance(forwarded, list):
+                forwarded = [forwarded]
+
+            # Update storage for each message in the album
+            for tm, fwd_msg in zip(messages, forwarded):
+                event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))
+                if event_uid not in st.stored:
+                    st.stored[event_uid] = {}
+                st.stored[event_uid][dest] = fwd_msg.id
+
+        except Exception as err:
+            logging.error(f"Failed to forward album to {dest}: {err}")
+
+
+async def forward_single_message(
+    tm: "TgcfMessage",
+    destinations: List[int]
+) -> None:
+    """Forward a single message to destinations.
+
+    Uses send_message utility which respects plugin modifications.
+    """
+    event_uid = st.EventUid(st.DummyEvent(tm.message.chat_id, tm.message.id))
+    if event_uid not in st.stored:
+        st.stored[event_uid] = {}
+
+    for dest in destinations:
+        try:
+            fwded_msg = await send_message(dest, tm)
+            st.stored[event_uid][dest] = fwded_msg.id
+        except Exception as err:
+            logging.error(f"Failed to forward message {tm.message.id} to {dest}: {err}")
+
+
+async def handle_reply_to(
+    tm: "TgcfMessage",
+    destinations: List[int]
+) -> None:
+    """Set up reply_to for forwarded message if original was a reply."""
+    if not tm.message.is_reply:
+        return
+
+    reply_event = st.DummyEvent(tm.message.chat_id, tm.message.reply_to_msg_id)
+    reply_event_uid = st.EventUid(reply_event)
+
+    # Only set reply_to if we've previously forwarded the message being replied to
+    if reply_event_uid in st.stored:
+        # Try to set reply for each destination
+        for dest in destinations:
+            if dest in st.stored[reply_event_uid]:
+                tm.reply_to = st.stored[reply_event_uid][dest]
+                break  # Use first available reply reference
