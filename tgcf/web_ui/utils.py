@@ -1,6 +1,6 @@
 import os
 from typing import Dict, List
-from run import package_dir
+from tgcf.web_ui.run import package_dir
 from streamlit.components.v1 import html
 from tgcf.config import write_config
 
@@ -47,7 +47,8 @@ def apply_theme(st,CONFIG,hidden_container):
         CONFIG.theme = 'dark'
     write_config(CONFIG)
     script = f"<script>localStorage.setItem('stActiveTheme-/-v1', '{{\"name\":\"{theme}\"}}');"
-    pages = os.listdir(os.path.join(package_dir,'pages'))
+    pages_dir = package_dir / 'pages'
+    pages = [p.name for p in pages_dir.iterdir()]
     for page in pages:
         script += f"localStorage.setItem('stActiveTheme-/{page[4:-3]}-v1', '{{\"name\":\"{theme}\"}}');"
     script += 'parent.location.reload()</script>'
