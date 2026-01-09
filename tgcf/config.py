@@ -160,7 +160,7 @@ def get_env_var(name: str, optional: bool = False) -> str:
         var = input(f"Enter {name}: ")
     return var
 
-
+# TODO: replace with telethon's get_peer_id when that gets fixed
 async def get_id(client: TelegramClient, peer):
     """Get the ID of a peer (can be username, phone, or ID)"""
     try:
