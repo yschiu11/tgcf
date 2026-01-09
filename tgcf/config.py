@@ -162,7 +162,20 @@ def get_env_var(name: str, optional: bool = False) -> str:
 
 
 async def get_id(client: TelegramClient, peer):
-    return await client.get_peer_id(peer)
+    """Get the ID of a peer (can be username, phone, or ID)"""
+    try:
+        # peer is already an integer ID
+        if isinstance(peer, int):
+            return peer
+        # peer is an integer string, convert it
+        if isinstance(peer, str) and peer.lstrip('-').isdigit():
+            return int(peer)
+        # get the entity first, then extract ID
+        entity = await client.get_entity(peer)
+        return entity.id
+    except Exception as err:
+        logging.error(f"Failed to get ID for peer {peer}: {err}")
+        raise
 
 
 async def load_from_to(
