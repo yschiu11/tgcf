@@ -44,6 +44,13 @@ async def send_message(recipient: EntityLike, tm: "TgcfMessage") -> Message:
     tm.message.text = tm.text
     return await client.send_message(recipient, tm.message, reply_to=tm.reply_to)
 
+async def send_album(client, album, destinations):
+    """Forward or send an album, depending on config."""
+    if CONFIG.show_forwarded_from:
+        await forward_album(client, album, destinations)
+    else:
+        await forward_album_anonymous(client, album, destinations)
+
 
 def cleanup(*files: str) -> None:
     """Delete the file names passed as args."""
@@ -147,6 +154,57 @@ class AlbumBuffer:
         return self.messages
 
 
+async def forward_album_anonymous(
+    client: TelegramClient,
+    album: AlbumBuffer,
+    destinations: list[int]
+) -> None:
+    """Send album as new messages without 'Forwarded from' attribution.
+
+    Sends media files as an album while preserving captions.
+    """
+    messages = album.get_messages()
+    if not messages:
+        return
+
+    source_chat_id = messages[0].message.chat_id
+
+    # Extract media and captions from album messages
+    files_to_send = []
+    captions = []
+
+    for tm in messages:
+        if tm.message.media:
+            files_to_send.append(tm.message.media)
+            captions.append(tm.text or "")
+
+    if not files_to_send:
+        logging.warning("No media found in album to send")
+        return
+
+    for dest in destinations:
+        try:
+            sent_messages = await client.send_file(
+                dest,
+                files_to_send,
+                caption=captions
+            )
+
+            # Ensure sent_messages is a list
+            if not isinstance(sent_messages, list):
+                sent_messages = [sent_messages]
+
+            # Update storage for each sent message
+            for tm, sent_msg in zip(messages, sent_messages):
+                event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))
+                if event_uid not in st.stored:
+                    st.stored[event_uid] = {}
+                st.stored[event_uid][dest] = sent_msg.id
+
+        except Exception as err:
+            logging.error(f"Failed to send album to {dest}: {err}")
+
+
 async def forward_album(
     client: TelegramClient,
     album: AlbumBuffer,
@@ -154,8 +212,8 @@ async def forward_album(
 ) -> None:
     """Forward an entire album to destinations.
 
-    Uses native Telegram forward to preserve album structure.
-    Note: Plugin modifications are NOT applied to albums.
+    Uses native Telegram forward to preserve album structure with 'Forwarded from' tag.
+    Falls back to anonymous sending if forwarding fails.
     """
     messages = album.get_messages()
     if not messages:
@@ -183,7 +241,9 @@ async def forward_album(
                 st.stored[event_uid][dest] = fwd_msg.id
 
         except Exception as err:
-            logging.error(f"Failed to forward album to {dest}: {err}")
+            logging.warning(f"Failed to forward album to {dest}: {err}. Trying anonymous send...")
+            # Fallback to anonymous sending for this destination only
+            await forward_album_anonymous(client, album, [dest])
 
 
 async def forward_single_message(
