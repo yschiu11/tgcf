@@ -16,8 +16,8 @@ from tgcf.plugins import apply_plugins, load_async_plugins
 from tgcf.utils import (
     clean_session_files,
     send_message,
+    send_album,
     AlbumBuffer,
-    forward_album,
     forward_single_message,
     handle_reply_to,
 )
@@ -32,7 +32,7 @@ async def _flush_album(chat_id: int, client: TelegramClient, destinations: list[
     buffer = _album_buffers.get(chat_id)
     if buffer and not buffer.is_empty():
         if buffer.is_album():
-            await forward_album(client, buffer, destinations)
+            await send_album(client, buffer, destinations)
         else:
             tm = buffer.get_messages()[0]
             await handle_reply_to(tm, destinations)
