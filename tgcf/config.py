@@ -91,7 +91,7 @@ class Config(BaseModel):
     past: PastSettings = PastSettings()
 
     plugins: PluginConfig = PluginConfig()
-    bot_messages = BotMessages()
+    bot_messages: BotMessages = BotMessages()
 
 
 def write_config_to_file(config: Config):
