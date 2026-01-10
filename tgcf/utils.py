@@ -81,7 +81,13 @@ async def send_message(recipient: EntityLike, tm: "TgcfMessage") -> Message:
     """Forward or send a copy, depending on config."""
     client: TelegramClient = tm.client
     if CONFIG.show_forwarded_from:
-        return await client.forward_messages(recipient, tm.message)
+        try:
+            return await client.forward_messages(recipient, tm.message)
+        except Exception as err:
+            logging.warning(f"Failed to forward message to {recipient}: {err}. Trying anonymous send...")
+            # Fallback to anonymous sending
+    
+    # Anonymous sending (either by config or as fallback)
     if tm.new_file:
         message = await client.send_file(
             recipient, tm.new_file, caption=tm.text, reply_to=tm.reply_to
