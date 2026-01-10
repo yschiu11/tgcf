@@ -18,7 +18,7 @@ from tgcf.plugins import apply_plugins, load_async_plugins
 from tgcf.utils import (
     clean_session_files,
     AlbumBuffer,
-    forward_album,
+    send_album,
     forward_single_message,
     handle_reply_to,
 )
@@ -39,7 +39,7 @@ async def process_buffered_messages(
 
     if album_buffer.is_album():
         # Multiple messages = true album, forward as batch
-        await forward_album(client, album_buffer, destinations)
+        await send_album(client, album_buffer, destinations)
     else:
         # Single message from buffer, forward individually
         tm = album_buffer.get_messages()[0]

@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import sys
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 from telethon import TelegramClient, events, functions, types
 from telethon.tl.custom.message import Message
@@ -16,8 +16,8 @@ from tgcf.plugins import apply_plugins, load_async_plugins
 from tgcf.utils import (
     clean_session_files,
     send_message,
+    send_album,
     AlbumBuffer,
-    forward_album,
     forward_single_message,
     handle_reply_to,
 )
@@ -32,7 +32,7 @@ async def _flush_album(chat_id: int, client: TelegramClient, destinations: list[
     buffer = _album_buffers.get(chat_id)
     if buffer and not buffer.is_empty():
         if buffer.is_album():
-            await forward_album(client, buffer, destinations)
+            await send_album(client, buffer, destinations)
         else:
             tm = buffer.get_messages()[0]
             await handle_reply_to(tm, destinations)
@@ -48,7 +48,7 @@ def _schedule_album_flush(
     chat_id: int,
     client: TelegramClient,
     destinations: list[int],
-    timeout: float = 0.5
+    timeout: Optional[float] = None,
 ) -> None:
     """Schedule or reschedule the album flush timeout for a chat.
 
@@ -56,8 +56,10 @@ def _schedule_album_flush(
         chat_id: Source chat ID
         client: Telegram client for forwarding
         destinations: List of destination chat IDs
-        timeout: Seconds to wait before flushing (default 0.5s)
+        timeout: Seconds to wait before flushing. If None, use CONFIG.live.album_flush_timeout
     """
+    if timeout is None:
+        timeout = CONFIG.live.album_flush_timeout
     # Cancel existing flush task if any
     if chat_id in _flush_tasks:
         _flush_tasks[chat_id].cancel()
