@@ -40,6 +40,7 @@ class LiveSettings(BaseModel):
     sequential_updates: bool = False
     delete_sync: bool = False
     delete_on_edit: Optional[str] = ".deleteMe"
+    album_flush_timeout: float = 0.6  # Seconds to wait before flushing incomplete albums
 
 
 class PastSettings(BaseModel):

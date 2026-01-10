@@ -21,6 +21,52 @@ if TYPE_CHECKING:
 
 from tgcf import storage as st
 
+class AlbumBuffer:
+    """Manages buffering and detection of media albums (grouped messages)."""
+
+    def __init__(self):
+        self.messages: list["TgcfMessage"] = []
+        self.current_group_id: Optional[int] = None
+
+    def add_message(self, tm: "TgcfMessage") -> None:
+        """Add a message to the current album buffer."""
+        self.messages.append(tm)
+        self.current_group_id = tm.message.grouped_id
+
+    def should_flush(self, next_grouped_id: Optional[int]) -> bool:
+        """Determine if the current album should be forwarded.
+
+        Returns True when:
+        - Buffer has messages AND
+        - Next message has different grouped_id (or no grouped_id)
+        """
+        if not self.messages:
+            return False
+
+        if self.current_group_id is None:
+            return False
+
+        return next_grouped_id != self.current_group_id
+
+    def is_album(self) -> bool:
+        """Check if buffer contains multiple messages (true album)."""
+        return len(self.messages) > 1
+
+    def is_empty(self) -> bool:
+        """Check if buffer is empty."""
+        return len(self.messages) == 0
+
+    def clear(self) -> None:
+        """Clear all buffered messages and group ID."""
+        for tm in self.messages:
+            tm.clear()
+        self.messages.clear()
+        self.current_group_id = None
+
+    def get_messages(self) -> list["TgcfMessage"]:
+        """Get all buffered messages."""
+        return self.messages
+
 
 def platform_info():
     nl = "\n"
@@ -44,7 +90,7 @@ async def send_message(recipient: EntityLike, tm: "TgcfMessage") -> Message:
     tm.message.text = tm.text
     return await client.send_message(recipient, tm.message, reply_to=tm.reply_to)
 
-async def send_album(client, album, destinations):
+async def send_album(client: TelegramClient, album: AlbumBuffer, destinations: list[int]) -> None:
     """Forward or send an album, depending on config."""
     if CONFIG.show_forwarded_from:
         await forward_album(client, album, destinations)
@@ -107,53 +153,6 @@ def clean_session_files():
             os.remove(item)
 
 
-class AlbumBuffer:
-    """Manages buffering and detection of media albums (grouped messages)."""
-
-    def __init__(self):
-        self.messages: list["TgcfMessage"] = []
-        self.current_group_id: Optional[int] = None
-
-    def add_message(self, tm: "TgcfMessage") -> None:
-        """Add a message to the current album buffer."""
-        self.messages.append(tm)
-        self.current_group_id = tm.message.grouped_id
-
-    def should_flush(self, next_grouped_id: Optional[int]) -> bool:
-        """Determine if the current album should be forwarded.
-
-        Returns True when:
-        - Buffer has messages AND
-        - Next message has different grouped_id (or no grouped_id)
-        """
-        if not self.messages:
-            return False
-
-        if self.current_group_id is None:
-            return False
-
-        return next_grouped_id != self.current_group_id
-
-    def is_album(self) -> bool:
-        """Check if buffer contains multiple messages (true album)."""
-        return len(self.messages) > 1
-
-    def is_empty(self) -> bool:
-        """Check if buffer is empty."""
-        return len(self.messages) == 0
-
-    def clear(self) -> None:
-        """Clear all buffered messages and group ID."""
-        for tm in self.messages:
-            tm.clear()
-        self.messages.clear()
-        self.current_group_id = None
-
-    def get_messages(self) -> list["TgcfMessage"]:
-        """Get all buffered messages."""
-        return self.messages
-
-
 async def forward_album_anonymous(
     client: TelegramClient,
     album: AlbumBuffer,
@@ -179,7 +178,7 @@ async def forward_album_anonymous(
             captions.append(tm.text or "")
 
     if not files_to_send:
-        logging.warning("No media found in album to send")
+        logging.error(f"Album with {len(messages)} messages has no media. IDs: {[m.message.id for m in messages]}")
         return
 
     for dest in destinations:
@@ -194,6 +193,8 @@ async def forward_album_anonymous(
             if not isinstance(sent_messages, list):
                 sent_messages = [sent_messages]
 
+            if len(sent_messages) != len(messages):
+                logging.error(f"Album size mismatch: expected {len(messages)}, got {len(sent_messages)}")
             # Update storage for each sent message
             for tm, sent_msg in zip(messages, sent_messages):
                 event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))
@@ -233,6 +234,8 @@ async def forward_album(
             if not isinstance(forwarded, list):
                 forwarded = [forwarded]
 
+            if len(forwarded) != len(messages):
+                logging.error(f"Album size mismatch: expected {len(messages)}, got {len(forwarded)}")
             # Update storage for each message in the album
             for tm, fwd_msg in zip(messages, forwarded):
                 event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))

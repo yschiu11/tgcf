@@ -3,7 +3,7 @@
 import asyncio
 import logging
 import sys
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 
 from telethon import TelegramClient, events, functions, types
 from telethon.tl.custom.message import Message
@@ -48,7 +48,7 @@ def _schedule_album_flush(
     chat_id: int,
     client: TelegramClient,
     destinations: list[int],
-    timeout: float = 0.5
+    timeout: Optional[float] = None,
 ) -> None:
     """Schedule or reschedule the album flush timeout for a chat.
 
@@ -56,8 +56,10 @@ def _schedule_album_flush(
         chat_id: Source chat ID
         client: Telegram client for forwarding
         destinations: List of destination chat IDs
-        timeout: Seconds to wait before flushing (default 0.5s)
+        timeout: Seconds to wait before flushing (uses CONFIG.live.album_flush_timeout if None)
     """
+    if timeout is None:
+        timeout = CONFIG.live.album_flush_timeout
     # Cancel existing flush task if any
     if chat_id in _flush_tasks:
         _flush_tasks[chat_id].cancel()
