@@ -40,7 +40,6 @@ async def process_buffered_messages(
     if album_buffer.is_album():
         # Multiple messages = true album, forward as batch
         await send_album(client, album_buffer, destinations)
-        
     else:
         # Single message from buffer, forward individually
         tm = album_buffer.get_messages()[0]

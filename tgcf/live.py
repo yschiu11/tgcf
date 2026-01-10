@@ -56,7 +56,7 @@ def _schedule_album_flush(
         chat_id: Source chat ID
         client: Telegram client for forwarding
         destinations: List of destination chat IDs
-        timeout: Seconds to wait before flushing (uses CONFIG.live.album_flush_timeout if None)
+        timeout: Seconds to wait before flushing. If None, use CONFIG.live.album_flush_timeout
     """
     if timeout is None:
         timeout = CONFIG.live.album_flush_timeout
