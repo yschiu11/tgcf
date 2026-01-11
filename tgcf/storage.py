@@ -30,6 +30,6 @@ class DummyEvent:
         self.id = msg_id
 
 
-stored: Dict[EventUid, Dict[int, Message]] = {}
+stored: Dict[EventUid, Dict[int, int]] = {}
 CONFIG_TYPE: int = 0
 mycol: Collection = None

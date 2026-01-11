@@ -121,9 +121,6 @@ async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
         # This message is part of an album, buffer it
         # Pre-create storage entry so edit/delete handlers can find it
         st.stored[event_uid] = {}
-        # Set reply_to before buffering
-        if CONFIG.reply_chain and event.is_reply and r_event_uid in st.stored:
-            tm.reply_to = st.stored.get(r_event_uid).get(dest[0]) if dest else None
         buffer.add_message(tm)
         # Schedule flush after timeout in case no more messages arrive
         _schedule_album_flush(chat_id, event.client, dest)
