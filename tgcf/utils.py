@@ -159,6 +159,28 @@ def clean_session_files():
             os.remove(item)
 
 
+def get_reply_to_mapping(source_chat_id: int, reply_to_msg_id: int) -> dict[int, Message]:
+    """Get reply_to message IDs for each destination if reply chain is enabled.
+    
+    Args:
+        source_chat_id: The chat ID where the original message came from
+        reply_to_msg_id: The message ID that the original message is replying to
+        
+    Returns:
+        Dict mapping destination chat IDs to their corresponding reply_to message IDs
+    """
+    if not CONFIG.reply_chain:
+        return {}
+    
+    reply_event = st.DummyEvent(source_chat_id, reply_to_msg_id)
+    reply_event_uid = st.EventUid(reply_event)
+    
+    if reply_event_uid in st.stored:
+        return st.stored[reply_event_uid]
+    
+    return {}
+
+
 async def forward_album_anonymous(
     client: TelegramClient,
     album: AlbumBuffer,
@@ -173,6 +195,7 @@ async def forward_album_anonymous(
         return
 
     source_chat_id = messages[0].message.chat_id
+    first_message = messages[0].message
 
     # Extract media and captions from album messages
     files_to_send = []
@@ -187,12 +210,21 @@ async def forward_album_anonymous(
         logging.error(f"Album with {len(messages)} messages has no media. IDs: {[m.message.id for m in messages]}")
         return
 
+    # Check if the first message in album is a reply
+    reply_to_mapping = {}
+    if first_message.is_reply:
+        reply_to_mapping = get_reply_to_mapping(source_chat_id, first_message.reply_to_msg_id)
+
     for dest in destinations:
         try:
+            # Get the correct reply_to for this destination
+            reply_to = reply_to_mapping.get(dest, None)
+
             sent_messages = await client.send_file(
                 dest,
                 files_to_send,
-                caption=captions
+                caption=captions,
+                reply_to=reply_to
             )
 
             # Ensure sent_messages is a list
@@ -267,29 +299,16 @@ async def forward_single_message(
     if event_uid not in st.stored:
         st.stored[event_uid] = {}
 
+    # Check if original message was a reply
+    reply_to_mapping = {}
+    if tm.message.is_reply:
+        reply_to_mapping = get_reply_to_mapping(tm.message.chat_id, tm.message.reply_to_msg_id)
+
     for dest in destinations:
         try:
+            # Set the correct reply_to for this specific destination
+            tm.reply_to = reply_to_mapping.get(dest, None)
             fwded_msg = await send_message(dest, tm)
             st.stored[event_uid][dest] = fwded_msg.id
         except Exception as err:
             logging.error(f"Failed to forward message {tm.message.id} to {dest}: {err}")
-
-
-async def handle_reply_to(
-    tm: "TgcfMessage",
-    destinations: list[int]
-) -> None:
-    """Set up reply_to for forwarded message if original was a reply."""
-    if not tm.message.is_reply:
-        return
-
-    reply_event = st.DummyEvent(tm.message.chat_id, tm.message.reply_to_msg_id)
-    reply_event_uid = st.EventUid(reply_event)
-
-    # Only set reply_to if we've previously forwarded the message being replied to
-    if reply_event_uid in st.stored:
-        # Try to set reply for each destination
-        for dest in destinations:
-            if dest in st.stored[reply_event_uid]:
-                tm.reply_to = st.stored[reply_event_uid][dest]
-                break  # Use first available reply reference
