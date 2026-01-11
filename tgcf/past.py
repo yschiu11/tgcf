@@ -20,7 +20,6 @@ from tgcf.utils import (
     AlbumBuffer,
     send_album,
     forward_single_message,
-    handle_reply_to,
 )
 
 
@@ -43,7 +42,6 @@ async def process_buffered_messages(
     else:
         # Single message from buffer, forward individually
         tm = album_buffer.get_messages()[0]
-        await handle_reply_to(tm, destinations)
         await forward_single_message(tm, destinations)
 
     album_buffer.clear()
@@ -105,7 +103,6 @@ async def forward_job() -> None:
                         album_buffer.add_message(tm)
                     else:
                         # This is a standalone message, forward it immediately
-                        await handle_reply_to(tm, dest)
                         await forward_single_message(tm, dest)
                         tm.clear()
 

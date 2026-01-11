@@ -19,7 +19,6 @@ from tgcf.utils import (
     send_album,
     AlbumBuffer,
     forward_single_message,
-    handle_reply_to,
 )
 
 # Per-chat album buffers and flush tasks for managing concurrent albums
@@ -35,7 +34,6 @@ async def _flush_album(chat_id: int, client: TelegramClient, destinations: list[
             await send_album(client, buffer, destinations)
         else:
             tm = buffer.get_messages()[0]
-            await handle_reply_to(tm, destinations)
             await forward_single_message(tm, destinations)
         buffer.clear()
 
@@ -124,7 +122,7 @@ async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
         # Pre-create storage entry so edit/delete handlers can find it
         st.stored[event_uid] = {}
         # Set reply_to before buffering
-        if event.is_reply and r_event_uid in st.stored:
+        if CONFIG.reply_chain and event.is_reply and r_event_uid in st.stored:
             tm.reply_to = st.stored.get(r_event_uid).get(dest[0]) if dest else None
         buffer.add_message(tm)
         # Schedule flush after timeout in case no more messages arrive
@@ -132,7 +130,6 @@ async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
     else:
         # Standalone message, forward immediately
         st.stored[event_uid] = {}
-        await handle_reply_to(tm, dest)
         await forward_single_message(tm, dest)
         tm.clear()
 
