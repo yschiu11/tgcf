@@ -25,6 +25,13 @@ def termination():
     write_config(CONFIG)
     st.button("Refresh page")
 
+# TODO: Clear streamlit logic
+def update_forwarded_from():
+    if st.session_state.reply_chain:
+        st.session_state.show_forwarded_from = False
+def update_reply_chain():
+    if st.session_state.show_forwarded_from:
+        st.session_state.reply_chain = False
 
 st.set_page_config(
     page_title="Run",
@@ -33,10 +40,28 @@ st.set_page_config(
 hide_st(st)
 switch_theme(st,CONFIG)
 if check_password(st):
+    if 'show_forwarded_from' not in st.session_state:
+        st.session_state.show_forwarded_from = CONFIG.show_forwarded_from
+    if 'reply_chain' not in st.session_state:
+        st.session_state.reply_chain = CONFIG.reply_chain
+
     with st.expander("Configure Run"):
-        CONFIG.show_forwarded_from = st.checkbox(
-            "Show 'Forwarded from'", value=CONFIG.show_forwarded_from
+        st.checkbox(
+            "Show 'Forwarded from'",
+            key='show_forwarded_from',
+            help="When enabled, forwarded messages will display the original sender's information in the destination chat.",
+            on_change=update_reply_chain
         )
+        st.checkbox(
+            "Forward reply chains",
+            key='reply_chain',
+            help="When enabled, messages that are replies will maintain the reply chain in destination chats. The forwarded message will reply to the previously forwarded message that corresponds to the original reply target.",
+            on_change=update_forwarded_from
+        )
+
+        CONFIG.show_forwarded_from = st.session_state.show_forwarded_from
+        CONFIG.reply_chain = st.session_state.reply_chain
+
         mode = st.radio("Choose mode", ["live", "past"], index=CONFIG.mode)
         if mode == "past":
             CONFIG.mode = 1
@@ -44,7 +69,7 @@ if check_password(st):
                 "Only User Account can be used in Past mode. Telegram does not allow bot account to go through history of a chat!"
             )
             CONFIG.past.delay = st.slider(
-                "Delay in seconds", 0, 100, value=CONFIG.past.delay
+                "Delay in seconds", 0, 10, value=CONFIG.past.delay
             )
         else:
             CONFIG.mode = 0
