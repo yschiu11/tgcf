@@ -52,10 +52,10 @@ class PastSettings(BaseModel):
     @validator("delay")
     def validate_delay(cls, val):  # pylint: disable=no-self-use,no-self-argument
         """Check if the delay used by user is values. If not, use closest logical values."""
-        if val not in range(0, 101):
-            logging.warning("delay must be within 0 to 100 seconds")
-            if val > 100:
-                val = 100
+        if val not in range(0, 11):
+            logging.warning("delay must be within 0 to 10 seconds")
+            if val > 10:
+                val = 10
             if val < 0:
                 val = 0
         return val
@@ -86,7 +86,8 @@ class Config(BaseModel):
     login: LoginConfig = LoginConfig()
     admins: List[Union[int, str]] = []
     forwards: List[Forward] = []
-    show_forwarded_from: bool = False
+    show_forwarded_from: bool = False # Show 'Forwarded from' in forwarded messages
+    reply_chain: bool = False  # Forward reply chains from source to destination
     mode: int = 0  # 0: live, 1:past
     live: LiveSettings = LiveSettings()
     past: PastSettings = PastSettings()
