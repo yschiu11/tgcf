@@ -35,7 +35,14 @@ switch_theme(st,CONFIG)
 if check_password(st):
     with st.expander("Configure Run"):
         CONFIG.show_forwarded_from = st.checkbox(
-            "Show 'Forwarded from'", value=CONFIG.show_forwarded_from
+            "Show 'Forwarded from'",
+            value=CONFIG.show_forwarded_from,
+            help="When enabled, forwarded messages will display the original sender's information in the destination chat.",
+        )
+        CONFIG.reply_chain = st.checkbox(
+            "Forward reply chains",
+            value=CONFIG.reply_chain,
+            help="When enabled, messages that are replies will maintain the reply chain in destination chats. The forwarded message will reply to the previously forwarded message that corresponds to the original reply target."
         )
         mode = st.radio("Choose mode", ["live", "past"], index=CONFIG.mode)
         if mode == "past":
@@ -44,7 +51,7 @@ if check_password(st):
                 "Only User Account can be used in Past mode. Telegram does not allow bot account to go through history of a chat!"
             )
             CONFIG.past.delay = st.slider(
-                "Delay in seconds", 0, 100, value=CONFIG.past.delay
+                "Delay in seconds", 0, 10, value=CONFIG.past.delay
             )
         else:
             CONFIG.mode = 0
