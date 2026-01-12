@@ -6,7 +6,7 @@ import sys
 from typing import Dict, List, Optional, Union, Any
 
 from dotenv import load_dotenv
-from pydantic import BaseModel, validator  # pylint: disable=no-name-in-module
+from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
 from pymongo import MongoClient
 from telethon import TelegramClient
 from telethon.sessions import StringSession
@@ -49,9 +49,10 @@ class PastSettings(BaseModel):
     # pylint: disable=too-few-public-methods
     delay: int = 0
 
-    @validator("delay")
-    def validate_delay(cls, val):  # pylint: disable=no-self-use,no-self-argument
-        """Check if the delay used by user is values. If not, use closest logical values."""
+    @field_validator("delay")
+    @classmethod
+    def validate_delay(cls, val: int) -> int:  # pylint: disable=no-self-use,no-self-argument
+        """Check if the delay used by user is valid. If not, use closest logical values."""
         if val not in range(0, 11):
             logging.warning("delay must be within 0 to 10 seconds")
             if val > 10:
@@ -98,7 +99,7 @@ class Config(BaseModel):
 
 def write_config_to_file(config: Config):
     with open(CONFIG_FILE_NAME, "w", encoding="utf8") as file:
-        file.write(config.json())
+        file.write(config.model_dump_json())
 
 
 def detect_config_type() -> int:
@@ -132,7 +133,7 @@ def read_config(count=1) -> Config:
     try:
         if stg.CONFIG_TYPE == 1:
             with open(CONFIG_FILE_NAME, encoding="utf8") as file:
-                return Config.parse_raw(file.read())
+                return Config.model_validate_json(file.read())
         elif stg.CONFIG_TYPE == 2:
             return read_db()
         else:
@@ -228,13 +229,13 @@ def setup_mongo(client):
     mydb = client[MONGO_DB_NAME]
     mycol = mydb[MONGO_COL_NAME]
     if not mycol.find_one({"_id": 0}):
-        mycol.insert_one({"_id": 0, "author": "tgcf", "config": Config().dict()})
+        mycol.insert_one({"_id": 0, "author": "tgcf", "config": Config().model_dump()})
 
     return mycol
 
 
 def update_db(cfg):
-    stg.mycol.update_one({"_id": 0}, {"$set": {"config": cfg.dict()}})
+    stg.mycol.update_one({"_id": 0}, {"$set": {"config": cfg.model_dump()}})
 
 
 def read_db():
@@ -254,7 +255,7 @@ stg.CONFIG_TYPE = detect_config_type()
 CONFIG = read_config()
 
 if PASSWORD == "tgcf":
-    logging.warn(
+    logging.warning(
         "You have not set a password to protect the web access to tgcf.\nThe default password `tgcf` is used."
     )
 from_to = {}
