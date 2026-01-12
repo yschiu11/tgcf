@@ -255,7 +255,7 @@ stg.CONFIG_TYPE = detect_config_type()
 CONFIG = read_config()
 
 if PASSWORD == "tgcf":
-    logging.warn(
+    logging.warning(
         "You have not set a password to protect the web access to tgcf.\nThe default password `tgcf` is used."
     )
 from_to = {}
