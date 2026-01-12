@@ -11,7 +11,8 @@ import typer
 from dotenv import load_dotenv
 from rich import console, traceback
 from rich.logging import RichHandler
-from verlat import latest_release
+# TODO: ignore because dependency issue on pydantic v2
+# from verlat import latest_release
 
 from tgcf import __version__
 
@@ -66,15 +67,8 @@ def version_callback(value: bool):
 
 
 def version_check():
-    latver = latest_release("tgcf").version
-    if __version__ != latver:
-        con.print(
-            f"tgcf has a newer release {latver} availaible!\
-            \nVisit http://bit.ly/update-tgcf",
-            style="bold yellow",
-        )
-    else:
-        con.print(f"Running latest tgcf version {__version__}", style="bold green")
+    """Deprecated: This function is no longer used due to dependency issues."""
+    pass
 
 
 @app.command()
