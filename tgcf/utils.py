@@ -342,3 +342,37 @@ def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
                 channel = int(f"-100{channel}")
             return (channel, msg_id)
     return None
+
+
+async def resolve_dest_ids(
+    client: TelegramClient,
+    destinations: list[int | str],
+) -> list[int]:
+    """Resolve a list of destinations to their numeric chat IDs.
+
+    Handles three formats:
+    - Integer IDs: Used directly
+    - String numeric IDs: Converted to int (e.g., "-100123456789")
+    - Usernames: Resolved via Telegram API (e.g., "@channel_name" or "channel_name")
+
+    Args:
+        client: Authenticated TelegramClient
+        destinations: List of destination chat IDs or usernames
+
+    Returns:
+        List of resolved numeric chat IDs
+    """
+    dest_ids = []
+    for dest in destinations:
+        try:
+            if isinstance(dest, int):
+                dest_ids.append(dest)
+            elif dest.lstrip('-').isdigit():
+                dest_ids.append(int(dest))
+            else:
+                entity = await client.get_entity(dest)
+                dest_ids.append(entity.id)
+        except Exception as err:
+            logging.error(f"Failed to resolve destination {dest}: {err}")
+            raise
+    return dest_ids
