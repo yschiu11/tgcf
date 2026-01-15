@@ -500,3 +500,48 @@ async def resolve_dest_ids(
             logging.error(f"Failed to resolve destination {dest}: {err}")
             raise
     return dest_ids
+
+
+async def forward_by_link(
+    client: TelegramClient,
+    url: str,
+    destinations: list[int | str],
+) -> None:
+    """Forward a message or album by its Telegram post link.
+
+    Always sends as a clean copy without 'Forwarded from' attribution.
+    Uses fallback download+reupload for protected channels.
+
+    Args:
+        client: Authenticated TelegramClient
+        url: Telegram post link
+        destinations: List of destination chat IDs or usernames
+    """
+    parsed = parse_telegram_link(url)
+    if not parsed:
+        raise ValueError(f"Invalid Telegram link: {url}")
+
+    channel, msg_id = parsed
+    logging.info(f"Parsed link: channel={channel}, msg_id={msg_id}")
+
+    dest_ids = await resolve_dest_ids(client, destinations)
+
+    # Fetch the target message
+    message = await client.get_messages(channel, ids=msg_id)
+    if not message:
+        raise ValueError(f"Message not found: {url}")
+
+    logging.info(f"Fetched message: id={message.id}, grouped_id={message.grouped_id}")
+
+    if message.grouped_id:
+        album_buffer = await fetch_album_by_message(
+            client, channel, msg_id, message.grouped_id
+        )
+
+        await send_album_with_fallback(client, album_buffer, dest_ids)
+    else:
+        for dest in dest_ids:
+            try:
+                await send_single_message_with_fallback(client, message, dest)
+            except Exception as err:
+                logging.error(f"Failed to send message to {dest}: {err}")
