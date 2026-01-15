@@ -242,6 +242,7 @@ async def forward_album_anonymous(
 
         except Exception as err:
             logging.error(f"Failed to send album to {dest}: {err}")
+            raise
 
 
 async def forward_album(
@@ -370,6 +371,102 @@ async def fetch_album_by_message(
         album_buffer.add_message(m)
 
     return album_buffer
+
+
+async def send_single_message_with_fallback(
+    client: TelegramClient,
+    message: Message,
+    dest: int,
+) -> None:
+    """Send a single message to destination, with fallback for protected content.
+
+    First tries send_message (via TgcfMessage wrapper). If that fails due to protected
+    content restrictions, downloads the media and re-uploads as new content.
+    """
+    from tgcf.plugins import TgcfMessage
+
+    # Wrap raw message in TgcfMessage for compatibility with send_message
+    tm = TgcfMessage(message)
+    tm.client = client
+
+    # Try send_message first (faster for non-protected channels)
+    try:
+        await send_message(dest, tm)
+        logging.info(f"Sent message to {dest} (direct)")
+        return
+    except Exception as err:
+        logging.info(f"Protected content detected, falling back to download+reupload for {dest}")
+
+    # Fallback: download and re-upload
+    if not message.media:
+        raise ValueError("Failed to send text message")
+
+    file_path = None
+    try:
+        file_path = await message.download_media("")
+        if not file_path:
+            raise ValueError("Failed to download media")
+
+        logging.info(f"Downloaded media to {file_path}")
+
+        await client.send_file(dest, file_path, caption=message.text)
+        logging.info(f"Sent message to {dest} (via download+reupload)")
+    finally:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+            logging.info(f"Cleaned up temp file: {file_path}")
+
+
+async def send_album_with_fallback(
+    client: TelegramClient,
+    album_buffer: AlbumBuffer,
+    dest_ids: list[int],
+) -> None:
+    """Send an album to destinations, with fallback for protected content.
+
+    First tries forward_album_anonymous. If that fails due to protected content restrictions,
+    downloads all media and re-uploads as new content.
+    """
+    messages = album_buffer.get_messages()
+    if not messages:
+        return
+
+    # Try forward_album_anonymous first (faster for non-protected channels)
+    try:
+        await forward_album_anonymous(client, album_buffer, dest_ids)
+        logging.info(f"Sent album to destinations (direct)")
+        return
+    except Exception as err:
+        logging.info(f"Protected content detected, falling back to download+reupload: {err}")
+
+    # Fallback: download all media and re-upload
+    captions = [tm.text or "" for tm in messages if tm.message.media]
+    downloaded_files = []
+    try:
+        for tm in messages:
+            if tm.message.media:
+                file_path = await tm.message.download_media("")
+                if file_path:
+                    downloaded_files.append(file_path)
+                    logging.info(f"Downloaded: {file_path}")
+
+        if not downloaded_files:
+            logging.error(f"Failed to download any media for album")
+            raise ValueError("Failed to download any media for album")
+
+        # Re-upload as new album to all destinations
+        for dest in dest_ids:
+            try:
+                await client.send_file(dest, downloaded_files, caption=captions)
+                logging.info(f"Sent album to {dest} (via download+reupload)")
+            except Exception as err:
+                logging.error(f"Failed to send album via fallback to {dest}: {err}")
+    finally:
+        for file_path in downloaded_files:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logging.info(f"Cleaned up: {file_path}")
+
 
 async def resolve_dest_ids(
     client: TelegramClient,
