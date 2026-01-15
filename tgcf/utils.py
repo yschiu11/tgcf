@@ -16,6 +16,10 @@ from tgcf import __version__
 from tgcf.config import CONFIG
 from tgcf.plugin_models import STYLE_CODES
 
+# Telegram albums can have up to 10 items. We search ±10 messages around
+# the target to ensure we capture the full album even if there are gaps.
+ALBUM_SEARCH_RADIUS = 10
+
 if TYPE_CHECKING:
     from tgcf.plugins import TgcfMessage
 
@@ -357,7 +361,9 @@ async def fetch_album_by_message(
     album_buffer = AlbumBuffer()
 
     # Fetch nearby messages to find all album members
-    messages = await client.get_messages(entity, ids=range(msg_id - 10, msg_id + 11))
+    messages = await client.get_messages(
+        entity, ids=range(msg_id - ALBUM_SEARCH_RADIUS, msg_id + ALBUM_SEARCH_RADIUS + 1)
+    )
 
     # Filter and wrap in TgcfMessage
     album_messages: list[TgcfMessage] = [
@@ -395,11 +401,11 @@ async def send_single_message_with_fallback(
         logging.info(f"Sent message to {dest} (direct)")
         return
     except Exception as err:
-        logging.info(f"Protected content detected, falling back to download+reupload for {dest}")
+        logging.info(f"Direct send failed for {dest}: {err}. Falling back to download+reupload.")
 
     # Fallback: download and re-upload
     if not message.media:
-        raise ValueError("Failed to send text message")
+        raise ValueError("Cannot use download fallback for text-only messages")
 
     file_path = None
     try:

@@ -49,7 +49,7 @@ async def list_channels() -> None:
                     entry = f"[{chat_type}]{restricted}\n"
                     entry += f"\tName: {dialog.name}\n"
                     entry += f"\tID: {dialog.id}\n"
-                    if getattr(entity, 'username', False):
+                    if getattr(entity, 'username', None):
                         entry += f"\tUsername: @{entity.username}\n"
                     entry += "\n"
 
