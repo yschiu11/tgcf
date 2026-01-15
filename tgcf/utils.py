@@ -344,6 +344,33 @@ def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
     return None
 
 
+async def fetch_album_by_message(
+    client: TelegramClient,
+    entity: EntityLike,
+    msg_id: int,
+    grouped_id: int
+) -> AlbumBuffer:
+    """Fetch all messages in an album given one message from the album."""
+    from tgcf.plugins import TgcfMessage
+
+    album_buffer = AlbumBuffer()
+
+    # Fetch nearby messages to find all album members
+    messages = await client.get_messages(entity, ids=range(msg_id - 10, msg_id + 11))
+
+    # Filter and wrap in TgcfMessage
+    album_messages: list[TgcfMessage] = [
+        TgcfMessage(m) for m in messages
+        if m is not None and m.grouped_id == grouped_id
+    ]
+
+    # Sort by message ID to maintain order
+    album_messages.sort(key=lambda m: m.message.id)
+    for m in album_messages:
+        album_buffer.add_message(m)
+
+    return album_buffer
+
 async def resolve_dest_ids(
     client: TelegramClient,
     destinations: list[int | str],
