@@ -312,3 +312,33 @@ async def forward_single_message(
             st.stored[event_uid][dest] = fwded_msg.id
         except Exception as err:
             logging.error(f"Failed to forward message {tm.message.id} to {dest}: {err}")
+
+
+def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
+    """Parse a Telegram post link into (channel, message_id).
+
+    Supports:
+    - Public: https://t.me/channel_username/123
+    - Private: https://t.me/c/1234567890/123
+
+    Returns:
+        Tuple of (channel_identifier, message_id) or None if invalid
+    """
+    # TODO: Confirm link formats
+    patterns = [
+        # Public: https://t.me/channel_name/123 or t.me/channel_name/123
+        (r"(?:https?://)?t\.me/([a-zA-Z_][a-zA-Z0-9_]{3,})/(\d+)", False),
+        # Private: https://t.me/c/1234567890/123
+        (r"(?:https?://)?t\.me/c/(\d+)/(\d+)", True),
+    ]
+
+    for pattern, is_private in patterns:
+        match = re.match(pattern, url)
+        if match:
+            channel = match.group(1)
+            msg_id = int(match.group(2))
+            # For private links, convert to proper channel ID format
+            if is_private:
+                channel = int(f"-100{channel}")
+            return (channel, msg_id)
+    return None
