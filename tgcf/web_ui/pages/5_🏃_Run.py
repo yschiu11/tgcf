@@ -117,7 +117,7 @@ if check_password(st):
     if check:
         with open("logs.txt", "w") as logs:
             process = subprocess.Popen(
-                ["tgcf", "--loud", mode],
+                ["tgcf", "main", mode, "--loud"],
                 stdout=logs,
                 stderr=subprocess.STDOUT,
             )

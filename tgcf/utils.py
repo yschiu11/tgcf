@@ -16,6 +16,10 @@ from tgcf import __version__
 from tgcf.config import CONFIG
 from tgcf.plugin_models import STYLE_CODES
 
+# Telegram albums can have up to 10 items. We search ±10 messages around
+# the target to ensure we capture the full album even if there are gaps.
+ALBUM_SEARCH_RADIUS = 10
+
 if TYPE_CHECKING:
     from tgcf.plugins import TgcfMessage
 
@@ -242,6 +246,7 @@ async def forward_album_anonymous(
 
         except Exception as err:
             logging.error(f"Failed to send album to {dest}: {err}")
+            raise
 
 
 async def forward_album(
@@ -312,3 +317,237 @@ async def forward_single_message(
             st.stored[event_uid][dest] = fwded_msg.id
         except Exception as err:
             logging.error(f"Failed to forward message {tm.message.id} to {dest}: {err}")
+
+
+def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
+    """Parse a Telegram post link into (channel, message_id).
+
+    Supports:
+    - Public: https://t.me/channel_username/123
+    - Private: https://t.me/c/1234567890/123
+
+    Returns:
+        Tuple of (channel_identifier, message_id) or None if invalid
+    """
+    # TODO: Confirm link formats
+    patterns = [
+        # Public: https://t.me/channel_name/123 or t.me/channel_name/123
+        (r"(?:https?://)?t\.me/([a-zA-Z_][a-zA-Z0-9_]{3,})/(\d+)", False),
+        # Private: https://t.me/c/1234567890/123
+        (r"(?:https?://)?t\.me/c/(\d+)/(\d+)", True),
+    ]
+
+    for pattern, is_private in patterns:
+        match = re.match(pattern, url)
+        if match:
+            channel = match.group(1)
+            msg_id = int(match.group(2))
+            # For private links, convert to proper channel ID format
+            if is_private:
+                channel = int(f"-100{channel}")
+            return (channel, msg_id)
+    return None
+
+
+async def fetch_album_by_message(
+    client: TelegramClient,
+    entity: EntityLike,
+    msg_id: int,
+    grouped_id: int
+) -> AlbumBuffer:
+    """Fetch all messages in an album given one message from the album."""
+    from tgcf.plugins import TgcfMessage
+
+    album_buffer = AlbumBuffer()
+
+    # Fetch nearby messages to find all album members
+    messages = await client.get_messages(
+        entity, ids=range(msg_id - ALBUM_SEARCH_RADIUS, msg_id + ALBUM_SEARCH_RADIUS + 1)
+    )
+
+    # Filter and wrap in TgcfMessage
+    album_messages: list[TgcfMessage] = [
+        TgcfMessage(m) for m in messages
+        if m is not None and m.grouped_id == grouped_id
+    ]
+
+    # Sort by message ID to maintain order
+    album_messages.sort(key=lambda m: m.message.id)
+    for m in album_messages:
+        album_buffer.add_message(m)
+
+    return album_buffer
+
+
+async def send_single_message_with_fallback(
+    client: TelegramClient,
+    message: Message,
+    dest: int,
+) -> None:
+    """Send a single message to destination, with fallback for protected content.
+
+    First tries send_message (via TgcfMessage wrapper). If that fails due to protected
+    content restrictions, downloads the media and re-uploads as new content.
+    """
+    from tgcf.plugins import TgcfMessage
+
+    # Wrap raw message in TgcfMessage for compatibility with send_message
+    tm = TgcfMessage(message)
+    tm.client = client
+
+    # Try send_message first (faster for non-protected channels)
+    try:
+        await send_message(dest, tm)
+        logging.info(f"Sent message to {dest} (direct)")
+        return
+    except Exception as err:
+        logging.info(f"Direct send failed for {dest}: {err}. Falling back to download+reupload.")
+
+    # Fallback: download and re-upload
+    if not message.media:
+        raise ValueError("Cannot use download fallback for text-only messages")
+
+    file_path = None
+    try:
+        file_path = await message.download_media("")
+        if not file_path:
+            raise ValueError("Failed to download media")
+
+        logging.info(f"Downloaded media to {file_path}")
+
+        await client.send_file(dest, file_path, caption=message.text)
+        logging.info(f"Sent message to {dest} (via download+reupload)")
+    finally:
+        if file_path and os.path.exists(file_path):
+            os.remove(file_path)
+            logging.info(f"Cleaned up temp file: {file_path}")
+
+
+async def send_album_with_fallback(
+    client: TelegramClient,
+    album_buffer: AlbumBuffer,
+    dest_ids: list[int],
+) -> None:
+    """Send an album to destinations, with fallback for protected content.
+
+    First tries forward_album_anonymous. If that fails due to protected content restrictions,
+    downloads all media and re-uploads as new content.
+    """
+    messages = album_buffer.get_messages()
+    if not messages:
+        return
+
+    # Try forward_album_anonymous first (faster for non-protected channels)
+    try:
+        await forward_album_anonymous(client, album_buffer, dest_ids)
+        logging.info(f"Sent album to destinations (direct)")
+        return
+    except Exception as err:
+        logging.info(f"Protected content detected, falling back to download+reupload: {err}")
+
+    # Fallback: download all media and re-upload
+    captions = [tm.text or "" for tm in messages if tm.message.media]
+    downloaded_files = []
+    try:
+        for tm in messages:
+            if tm.message.media:
+                file_path = await tm.message.download_media("")
+                if file_path:
+                    downloaded_files.append(file_path)
+                    logging.info(f"Downloaded: {file_path}")
+
+        if not downloaded_files:
+            logging.error(f"Failed to download any media for album")
+            raise ValueError("Failed to download any media for album")
+
+        # Re-upload as new album to all destinations
+        for dest in dest_ids:
+            try:
+                await client.send_file(dest, downloaded_files, caption=captions)
+                logging.info(f"Sent album to {dest} (via download+reupload)")
+            except Exception as err:
+                logging.error(f"Failed to send album via fallback to {dest}: {err}")
+    finally:
+        for file_path in downloaded_files:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                logging.info(f"Cleaned up: {file_path}")
+
+
+async def resolve_dest_ids(
+    client: TelegramClient,
+    destinations: list[int | str],
+) -> list[int]:
+    """Resolve a list of destinations to their numeric chat IDs.
+
+    Handles three formats:
+    - Integer IDs: Used directly
+    - String numeric IDs: Converted to int (e.g., "-100123456789")
+    - Usernames: Resolved via Telegram API (e.g., "@channel_name" or "channel_name")
+
+    Args:
+        client: Authenticated TelegramClient
+        destinations: List of destination chat IDs or usernames
+
+    Returns:
+        List of resolved numeric chat IDs
+    """
+    dest_ids = []
+    for dest in destinations:
+        try:
+            if isinstance(dest, int):
+                dest_ids.append(dest)
+            elif dest.lstrip('-').isdigit():
+                dest_ids.append(int(dest))
+            else:
+                entity = await client.get_entity(dest)
+                dest_ids.append(entity.id)
+        except Exception as err:
+            logging.error(f"Failed to resolve destination {dest}: {err}")
+            raise
+    return dest_ids
+
+
+async def forward_by_link(
+    client: TelegramClient,
+    url: str,
+    destinations: list[int | str],
+) -> None:
+    """Forward a message or album by its Telegram post link.
+
+    Always sends as a clean copy without 'Forwarded from' attribution.
+    Uses fallback download+reupload for protected channels.
+
+    Args:
+        client: Authenticated TelegramClient
+        url: Telegram post link
+        destinations: List of destination chat IDs or usernames
+    """
+    parsed = parse_telegram_link(url)
+    if not parsed:
+        raise ValueError(f"Invalid Telegram link: {url}")
+
+    channel, msg_id = parsed
+    logging.info(f"Parsed link: channel={channel}, msg_id={msg_id}")
+
+    dest_ids = await resolve_dest_ids(client, destinations)
+
+    # Fetch the target message
+    message = await client.get_messages(channel, ids=msg_id)
+    if not message:
+        raise ValueError(f"Message not found: {url}")
+
+    logging.info(f"Fetched message: id={message.id}, grouped_id={message.grouped_id}")
+
+    if message.grouped_id:
+        album_buffer = await fetch_album_by_message(
+            client, channel, msg_id, message.grouped_id
+        )
+
+        await send_album_with_fallback(client, album_buffer, dest_ids)
+    else:
+        for dest in dest_ids:
+            try:
+                await send_single_message_with_fallback(client, message, dest)
+            except Exception as err:
+                logging.error(f"Failed to send message to {dest}: {err}")
