@@ -114,4 +114,37 @@ def main(
         asyncio.run(start_sync())
 
 
+@app.command()
+def link(
+    url: str = typer.Argument(..., help="Telegram post link (e.g., https://t.me/channel/123)"),
+    dest: list[str] = typer.Option(
+        ..., "--dest", "-d", help="Destination chat ID or username (can specify multiple)"
+    ),
+    verbose: Optional[bool] = typer.Option(
+        None,
+        "--loud",
+        "-l",
+        callback=verbosity_callback,
+        help="Increase output verbosity.",
+    ),
+):
+    """Forward a single message or album by its Telegram post link.
+
+    Sends as a clean copy without 'Forwarded from' attribution.
+
+    Example usage:
+
+        tgcf link "https://t.me/durov/123" -d @my_channel
+
+        tgcf link "https://t.me/c/1234567890/456" -d -100123456 -d @backup_channel
+    """
+    if FAKE:
+        logging.critical("You are running fake with link mode")
+        sys.exit(1)
+
+    from tgcf.link import forward_link_job  # pylint: disable=import-outside-toplevel
+
+    asyncio.run(forward_link_job(url, dest))
+
+
 # AAHNIK 2021
