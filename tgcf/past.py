@@ -6,7 +6,6 @@
 
 import asyncio
 import logging
-import time
 
 from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError
@@ -112,7 +111,7 @@ async def forward_job() -> None:
                     write_config(CONFIG, persist=False)
 
                     # Rate limiting delay
-                    time.sleep(CONFIG.past.delay)
+                    await asyncio.sleep(CONFIG.past.delay)
                     logging.info(f"Slept for {CONFIG.past.delay} seconds")
 
                 except FloodWaitError as fwe:
