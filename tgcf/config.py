@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from typing import Dict, List, Optional, Union, Any
+import tempfile
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
@@ -98,8 +99,22 @@ class Config(BaseModel):
 
 
 def write_config_to_file(config: Config):
-    with open(CONFIG_FILE_NAME, "w", encoding="utf8") as file:
-        file.write(config.model_dump_json())
+    """Write config atomically to prevent corruption on crash."""
+    data = config.model_dump_json()
+
+    dir_name = os.path.dirname(CONFIG_FILE_NAME) or "."
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf8",
+        dir=dir_name,
+        delete=False,
+        suffix=".tmp"
+    ) as tmp:
+        tmp.write(data)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+
+    os.replace(tmp.name, CONFIG_FILE_NAME)
 
 
 def detect_config_type() -> int:
