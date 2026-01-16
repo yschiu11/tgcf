@@ -79,9 +79,8 @@ async def forward_job() -> None:
             async for message in client.iter_messages(
                 src, reverse=True, offset_id=forward.offset
             ):
-                # Skip if we've passed the end point
                 if forward.end and last_id > forward.end:
-                    continue
+                    break
 
                 # Skip service messages
                 if isinstance(message, MessageService):
