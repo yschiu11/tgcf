@@ -15,7 +15,6 @@ from tgcf import config
 from tgcf.config import CONFIG, get_SESSION, write_config
 from tgcf.plugins import apply_plugins, load_async_plugins
 from tgcf.utils import (
-    clean_session_files,
     AlbumBuffer,
     send_album,
     forward_single_message,
@@ -50,8 +49,6 @@ async def forward_job() -> None:
     """
     Forward all existing messages in the concerned chats.
     """
-    clean_session_files()
-
     # Load async plugins defined in plugin_models
     await load_async_plugins()
 
