@@ -88,9 +88,9 @@ async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
     exceeding = length - const.KEEP_LAST_MANY
 
     if exceeding > 0:
-        for key in st.stored:
+        keys_to_delete = list(st.stored.keys())[:exceeding]
+        for key in keys_to_delete:
             del st.stored[key]
-            break
 
     dest = config.from_to.get(chat_id)
 
