@@ -55,6 +55,8 @@ class TgcfFilter(TgcfPlugin):
             if match(allowed, text, self.filters.text.regex):
                 return True  # only when atleast one whitelisted pattern is found
 
+        return False
+
     def users_safe(self, tm: TgcfMessage) -> bool:
         flist = self.filters.users
         sender = str(tm.sender_id)
@@ -64,6 +66,7 @@ class TgcfFilter(TgcfPlugin):
             return True
         if sender in flist.whitelist:
             return True
+        return False
 
     def files_safe(self, tm: TgcfMessage) -> bool:
         flist = self.filters.files
@@ -74,3 +77,4 @@ class TgcfFilter(TgcfPlugin):
             return True
         if fl_type in flist.whitelist:
             return True
+        return False
