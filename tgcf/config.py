@@ -138,25 +138,22 @@ def detect_config_type() -> int:
         return 1
 
 
-def read_config(count=1) -> Config:
+def read_config() -> Config:
     """Load the configuration defined by user."""
-    if count > 3:
-        logging.warning("Failed to read config, returning default config")
-        return Config()
-    if count != 1:
-        logging.info(f"Trying to read config time:{count}")
-    try:
-        if stg.CONFIG_TYPE == 1:
+    if stg.CONFIG_TYPE == 1:
+        try:
             with open(CONFIG_FILE_NAME, encoding="utf8") as file:
                 return Config.model_validate_json(file.read())
-        elif stg.CONFIG_TYPE == 2:
-            return read_db()
-        else:
+        except FileNotFoundError:
+            logging.warning(f"{CONFIG_FILE_NAME} not found, using default config")
             return Config()
-    except Exception as err:
-        logging.warning(err)
-        stg.CONFIG_TYPE = detect_config_type()
-        return read_config(count=count + 1)
+        except Exception as err:
+            logging.error(f"Failed to parse {CONFIG_FILE_NAME}: {err}")
+            raise
+    elif stg.CONFIG_TYPE == 2:
+        return read_db()
+    else:
+        return Config()
 
 
 def write_config(config: Config, persist=True):
