@@ -61,7 +61,7 @@ class TgcfPlugin:
     async def __ainit__(self) -> None:
         """Asynchronous initialization here."""
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage:
+    def modify(self, tm: TgcfMessage) -> TgcfMessage | None:
         """Modify the message here."""
         return tm
 
@@ -116,7 +116,7 @@ async def load_async_plugins() -> None:
 async def apply_plugins(message: Message) -> TgcfMessage | None:
     """Apply all loaded plugins to a message.
 
-    Return None if message should be dropped (filterd or plugin failure).
+    Return None if message should be dropped (filtered or plugin failure).
     """
     tm = TgcfMessage(message)
 
