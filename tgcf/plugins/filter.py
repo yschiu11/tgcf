@@ -23,24 +23,19 @@ class TgcfFilter(TgcfPlugin):
             textf.blacklist = [item.lower() for item in textf.blacklist]
             textf.whitelist = [item.lower() for item in textf.whitelist]
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage:
-
-        if self.users_safe(tm):
-            logging.info("Message passed users filter")
-            if self.files_safe(tm):
-                logging.info("Message passed files filter")
-                if self.text_safe(tm):
-                    logging.info("Message passed text filter")
-                    return tm
+    def modify(self, tm: TgcfMessage) -> TgcfMessage | None:
+        if not self.users_safe(tm) or not self.files_safe(tm) or not self.text_safe(tm):
+            return None
+        return tm
 
     def text_safe(self, tm: TgcfMessage) -> bool:
         flist = self.filters.text
+        text = tm.text or ""
 
-        text = tm.text
+        if not text and not flist.whitelist:
+            return True
         if not flist.case_sensitive:
             text = text.lower()
-        if not text and flist.whitelist == []:
-            return True
 
         # first check if any blacklisted pattern is present
         for forbidden in flist.blacklist:

@@ -61,7 +61,7 @@ class TgcfPlugin:
     async def __ainit__(self) -> None:
         """Asynchronous initialization here."""
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage:
+    def modify(self, tm: TgcfMessage) -> TgcfMessage | None:
         """Modify the message here."""
         return tm
 
@@ -113,23 +113,30 @@ async def load_async_plugins() -> None:
                 logging.info(f"Plugin {id} asynchronously loaded")
 
 
-async def apply_plugins(message: Message) -> TgcfMessage:
-    """Apply all loaded plugins to a message."""
+async def apply_plugins(message: Message) -> TgcfMessage | None:
+    """Apply all loaded plugins to a message.
+
+    Return None if message should be dropped (filtered or plugin failure).
+    """
     tm = TgcfMessage(message)
 
     for _id, plugin in plugins.items():
         try:
             if inspect.iscoroutinefunction(plugin.modify):
-                ntm = await plugin.modify(tm)
+                tm = await plugin.modify(tm)
             else:
-                ntm = plugin.modify(tm)
+                tm = plugin.modify(tm)
         except Exception as err:
-            logging.error(f"Failed to apply plugin {_id}. \n {err} ")
-        else:
-            logging.info(f"Applied plugin {_id}")
-            if not ntm:
-                tm.clear()
-                return None
+            logging.error(f"Plugin {_id} failed: {err}. Dropping message for safety.")
+            tm.clear()
+            return None
+
+        if tm is None:
+            logging.info(f"Message filtered by plugin {_id}")
+            return None
+
+        logging.info(f"Applied plugin {_id}")
+
     return tm
 
 

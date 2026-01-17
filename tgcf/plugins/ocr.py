@@ -2,6 +2,7 @@ import pytesseract
 from PIL import Image
 
 from tgcf.plugins import TgcfMessage, TgcfPlugin
+from tgcf.plugin_models import FileType
 from tgcf.utils import cleanup
 
 
@@ -13,7 +14,7 @@ class TgcfOcr(TgcfPlugin):
 
     async def modify(self, tm: TgcfMessage) -> TgcfMessage:
 
-        if not tm.file_type in ["photo"]:
+        if tm.file_type != FileType.PHOTO:
             return tm
 
         file = await tm.get_file()
