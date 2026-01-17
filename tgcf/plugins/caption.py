@@ -11,5 +11,5 @@ class TgcfCaption(TgcfPlugin):
         logging.info(self.caption)
 
     def modify(self, tm: TgcfMessage) -> TgcfMessage:
-        tm.text = f"{self.caption.header}{tm.text}{self.caption.footer}"
+        tm.text = f"{self.caption.header}{tm.text or ''}{self.caption.footer}"
         return tm

@@ -30,7 +30,7 @@ class TgcfFilter(TgcfPlugin):
 
     def text_safe(self, tm: TgcfMessage) -> bool:
         flist = self.filters.text
-        text = tm.text
+        text = tm.text or ""
 
         if not text and not flist.whitelist:
             return True
