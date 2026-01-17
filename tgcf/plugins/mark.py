@@ -7,7 +7,7 @@ import requests
 from pydantic import BaseModel  # pylint: disable=no-name-in-module
 from watermark import File, Position, Watermark, apply_watermark
 
-from tgcf.plugin_models import MarkConfig
+from tgcf.plugin_models import MarkConfig, FileType
 from tgcf.plugins import TgcfMessage, TgcfPlugin
 from tgcf.utils import cleanup
 
@@ -39,7 +39,7 @@ class TgcfMark(TgcfPlugin):
         self.data = data
 
     async def modify(self, tm: TgcfMessage) -> TgcfMessage:
-        if not tm.file_type in ["gif", "video", "photo"]:
+        if tm.file_type not in [FileType.GIF, FileType.VIDEO, FileType.PHOTO]:
             return tm
         downloaded_file = await tm.get_file()
         base = File(downloaded_file)

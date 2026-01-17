@@ -4,6 +4,7 @@ import sys
 from tgcf.plugins import TgcfMessage, TgcfPlugin
 from tgcf.config import CONFIG, get_SESSION
 from telethon import TelegramClient
+from tgcf.plugin_models import FileType
 
 class TgcfSender(TgcfPlugin):
     id_ = "sender"
@@ -25,7 +26,7 @@ class TgcfSender(TgcfPlugin):
 
     async def modify(self, tm: TgcfMessage) -> TgcfMessage:
         tm.client = self.sender
-        if tm.file_type != "nofile":
+        if tm.file_type != FileType.NOFILE:
             tm.new_file = await tm.get_file()
             tm.cleanup = True
         return tm
