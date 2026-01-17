@@ -30,12 +30,12 @@ class TgcfFilter(TgcfPlugin):
 
     def text_safe(self, tm: TgcfMessage) -> bool:
         flist = self.filters.text
-
         text = tm.text
+
+        if not text and not flist.whitelist:
+            return True
         if not flist.case_sensitive:
             text = text.lower()
-        if not text and flist.whitelist == []:
-            return True
 
         # first check if any blacklisted pattern is present
         for forbidden in flist.blacklist:
