@@ -4,6 +4,7 @@ import logging
 import os
 import sys
 from typing import Dict, List, Optional, Union, Any
+import tempfile
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
@@ -98,8 +99,22 @@ class Config(BaseModel):
 
 
 def write_config_to_file(config: Config):
-    with open(CONFIG_FILE_NAME, "w", encoding="utf8") as file:
-        file.write(config.model_dump_json())
+    """Write config atomically to prevent corruption on crash."""
+    data = config.model_dump_json()
+
+    dir_name = os.path.dirname(CONFIG_FILE_NAME) or "."
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf8",
+        dir=dir_name,
+        delete=False,
+        suffix=".tmp"
+    ) as tmp:
+        tmp.write(data)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+
+    os.replace(tmp.name, CONFIG_FILE_NAME)
 
 
 def detect_config_type() -> int:
@@ -123,34 +138,30 @@ def detect_config_type() -> int:
         return 1
 
 
-def read_config(count=1) -> Config:
+def read_config() -> Config:
     """Load the configuration defined by user."""
-    if count > 3:
-        logging.warning("Failed to read config, returning default config")
-        return Config()
-    if count != 1:
-        logging.info(f"Trying to read config time:{count}")
-    try:
-        if stg.CONFIG_TYPE == 1:
+    if stg.CONFIG_TYPE == 1:
+        try:
             with open(CONFIG_FILE_NAME, encoding="utf8") as file:
                 return Config.model_validate_json(file.read())
-        elif stg.CONFIG_TYPE == 2:
-            return read_db()
-        else:
+        except FileNotFoundError:
+            logging.warning(f"{CONFIG_FILE_NAME} not found, using default config")
             return Config()
-    except Exception as err:
-        logging.warning(err)
-        stg.CONFIG_TYPE = detect_config_type()
-        return read_config(count=count + 1)
+        except Exception as err:
+            logging.error(f"Failed to parse {CONFIG_FILE_NAME}: {err}")
+            raise
+    elif stg.CONFIG_TYPE == 2:
+        return read_db()
+    else:
+        return Config()
 
 
-def write_config(config: Config, persist=True):
+def write_config(config: Config):
     """Write changes in config back to file."""
     if stg.CONFIG_TYPE == 1 or stg.CONFIG_TYPE == 0:
         write_config_to_file(config)
     elif stg.CONFIG_TYPE == 2:
-        if persist:
-            update_db(config)
+        update_db(config)
 
 
 def get_env_var(name: str, optional: bool = False) -> str:

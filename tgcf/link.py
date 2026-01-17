@@ -9,7 +9,7 @@ import logging
 from telethon import TelegramClient
 
 from tgcf.config import CONFIG, get_SESSION
-from tgcf.utils import clean_session_files, forward_by_link
+from tgcf.utils import forward_by_link
 
 
 async def forward_link_job(url: str, destinations: list[str]) -> None:
@@ -21,8 +21,6 @@ async def forward_link_job(url: str, destinations: list[str]) -> None:
         url: Telegram post link (e.g., https://t.me/channel/123)
         destinations: List of destination chat IDs or usernames
     """
-    clean_session_files()
-
     if CONFIG.login.user_type != 1:
         logging.warning(
             "Bot accounts cannot access protected channels or channels where they are not admin. "

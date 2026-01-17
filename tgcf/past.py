@@ -15,7 +15,6 @@ from tgcf import config
 from tgcf.config import CONFIG, get_SESSION, write_config
 from tgcf.plugins import apply_plugins, load_async_plugins
 from tgcf.utils import (
-    clean_session_files,
     AlbumBuffer,
     send_album,
     forward_single_message,
@@ -50,8 +49,6 @@ async def forward_job() -> None:
     """
     Forward all existing messages in the concerned chats.
     """
-    clean_session_files()
-
     # Load async plugins defined in plugin_models
     await load_async_plugins()
 
@@ -70,57 +67,56 @@ async def forward_job() -> None:
 
         for from_to, forward in zip(config.from_to.items(), config.CONFIG.forwards):
             src, dest = from_to
-            last_id = 0
             album_buffer = AlbumBuffer()
 
             logging.info(f"Forwarding messages from {src} to {dest}")
 
-            async for message in client.iter_messages(
-                src, reverse=True, offset_id=forward.offset
-            ):
-                if forward.end and last_id > forward.end:
-                    break
+            try:
+                async for message in client.iter_messages(
+                    src, reverse=True, offset_id=forward.offset
+                ):
+                    if forward.end and message.id > forward.end:
+                        break
 
-                # Skip service messages
-                if isinstance(message, MessageService):
-                    continue
-
-                try:
-                    # Apply plugins to transform the message
-                    tm = await apply_plugins(message)
-                    if not tm:
+                    # Skip service messages
+                    if isinstance(message, MessageService):
                         continue
 
-                    # Check if we should flush the current album buffer
-                    if album_buffer.should_flush(message.grouped_id):
-                        await process_buffered_messages(client, album_buffer, dest)
+                    try:
+                        # Apply plugins to transform the message
+                        tm = await apply_plugins(message)
+                        if not tm:
+                            continue
 
-                    # Process current message
-                    if message.grouped_id:
-                        # This message is part of an album, buffer it
-                        album_buffer.add_message(tm)
-                    else:
-                        # This is a standalone message, forward it immediately
-                        await forward_single_message(tm, dest)
-                        tm.clear()
+                        # Check if we should flush the current album buffer
+                        if album_buffer.should_flush(message.grouped_id):
+                            await process_buffered_messages(client, album_buffer, dest)
 
-                    # Update tracking
-                    last_id = message.id
-                    logging.info(f"Processed message with id = {last_id}")
-                    forward.offset = last_id
-                    write_config(CONFIG, persist=False)
+                        # Process current message
+                        if message.grouped_id:
+                            # This message is part of an album, buffer it
+                            album_buffer.add_message(tm)
+                        else:
+                            # This is a standalone message, forward it immediately
+                            await forward_single_message(tm, dest)
+                            tm.clear()
 
-                    # Rate limiting delay
-                    await asyncio.sleep(CONFIG.past.delay)
-                    logging.info(f"Slept for {CONFIG.past.delay} seconds")
+                        # Update tracking in memory; persisted in finally block
+                        forward.offset = message.id
 
-                except FloodWaitError as fwe:
-                    logging.info(f"Sleeping for {fwe}")
-                    await asyncio.sleep(delay=fwe.seconds)
-                except Exception as err:
-                    logging.exception(err)
+                        # Rate limiting delay
+                        await asyncio.sleep(CONFIG.past.delay)
+                        logging.info(f"Slept for {CONFIG.past.delay} seconds")
 
-            # Forward any remaining buffered album at the end
-            await process_buffered_messages(client, album_buffer, dest)
+                    except FloodWaitError as fwe:
+                        logging.info(f"Sleeping for {fwe}")
+                        await asyncio.sleep(delay=fwe.seconds)
+                    except Exception as err:
+                        logging.exception(err)
+            finally:
+                # Forward any remaining buffered album at the end
+                await process_buffered_messages(client, album_buffer, dest)
 
-            logging.info(f"Completed forwarding from {src} to {dest}")
+                logging.info(f"Completed forwarding from {src} to {dest}")
+
+                write_config(CONFIG)

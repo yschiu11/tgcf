@@ -157,12 +157,6 @@ def replace(pattern: str, new: str, string: str, regex: bool) -> str:
         return string.replace(pattern, new)
 
 
-def clean_session_files():
-    for item in os.listdir():
-        if item.endswith(".session") or item.endswith(".session-journal"):
-            os.remove(item)
-
-
 def get_reply_to_mapping(source_chat_id: int, reply_to_msg_id: int) -> dict[int, int]:
     """Get reply_to message IDs for each destination if reply chain is enabled.
     
