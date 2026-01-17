@@ -101,7 +101,7 @@ async def forward_job() -> None:
                             await forward_single_message(tm, dest)
                             tm.clear()
 
-                        # Update tracking
+                        # Update tracking in memory; persisted in finally block
                         forward.offset = message.id
 
                         # Rate limiting delay
