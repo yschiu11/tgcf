@@ -150,8 +150,7 @@ def replace(pattern: str, new: str, string: str, regex: bool) -> str:
 
     if regex:
         if new in STYLE_CODES:
-            compliled_pattern = re.compile(pattern)
-            return compliled_pattern.sub(repl=fmt_repl, string=string)
+            return re.sub(pattern, fmt_repl, string)
         return re.sub(pattern, new, string)
     else:
         return string.replace(pattern, new)
