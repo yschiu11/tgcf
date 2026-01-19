@@ -123,24 +123,23 @@ def write_config_to_file(config: Config):
 
 
 def detect_config_type() -> int:
-    if os.getenv("MONGO_CON_STR"):
-        if MONGO_CON_STR:
-            logging.info("Using mongo db for storing config!")
-            client = MongoClient(MONGO_CON_STR)
-            stg.mycol = setup_mongo(client)
+    if MONGO_CON_STR:
+        logging.info("Using mongo db for storing config!")
+        client = MongoClient(MONGO_CON_STR)
+        stg.mycol = setup_mongo(client)
         return 2
+
     if CONFIG_FILE_NAME in os.listdir():
         logging.info(f"{CONFIG_FILE_NAME} detected!")
         return 1
 
-    else:
-        logging.info(
-            "config file not found. mongo not found. creating local config file."
-        )
-        cfg = Config()
-        write_config_to_file(cfg)
-        logging.info(f"{CONFIG_FILE_NAME} created!")
-        return 1
+    logging.info(
+        "Config file not found. Creating local config file."
+    )
+    cfg = Config()
+    write_config_to_file(cfg)
+    logging.info(f"{CONFIG_FILE_NAME} created!")
+    return 1
 
 
 def read_config() -> Config:
@@ -257,6 +256,7 @@ MONGO_CON_STR = os.getenv("MONGO_CON_STR")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tgcf-config")
 MONGO_COL_NAME = os.getenv("MONGO_COL_NAME", "tgcf-instance-0")
 
+# CONFIG_TYPE = 0: default, 1: file, 2: mongo
 stg.CONFIG_TYPE = detect_config_type()
 CONFIG = read_config()
 
