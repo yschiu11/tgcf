@@ -22,6 +22,11 @@ env_file = os.path.join(pwd, ".env")
 load_dotenv(env_file)
 
 
+class ConfigurationError(Exception):
+    """Raised when configuration is invalid or incomplete."""
+    pass
+
+
 class Forward(BaseModel):
     """Blueprint for the forward object."""
 
@@ -267,11 +272,12 @@ logging.info("config.py got executed")
 def get_SESSION(section: Any = CONFIG.login, default: str = 'tgcf_bot'):
     if section.SESSION_STRING and section.user_type == 1:
         logging.info("using session string")
-        SESSION = StringSession(section.SESSION_STRING)
+        return StringSession(section.SESSION_STRING)
     elif section.BOT_TOKEN and section.user_type == 0:
         logging.info("using bot account")
-        SESSION = default
-    else:
-        logging.warning("Login information not set!")
-        sys.exit()
-    return SESSION
+        return default
+
+    raise ConfigurationError(
+        "Login information not set!"
+        "Set either SESSION_STRING or BOT_TOKEN in config file or environment variables."
+    )
