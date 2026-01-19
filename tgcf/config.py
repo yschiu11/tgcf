@@ -164,16 +164,6 @@ def write_config(config: Config):
         update_db(config)
 
 
-def get_env_var(name: str, optional: bool = False) -> str:
-    """Fetch an env var."""
-    var = os.getenv(name, "")
-
-    while not var:
-        if optional:
-            return ""
-        var = input(f"Enter {name}: ")
-    return var
-
 # TODO: replace with telethon's get_peer_id when that gets fixed
 async def get_id(client: TelegramClient, peer):
     """Get the ID of a peer (can be username, phone, or ID)"""
