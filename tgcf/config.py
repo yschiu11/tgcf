@@ -58,13 +58,8 @@ class PastSettings(BaseModel):
     @field_validator("delay")
     @classmethod
     def validate_delay(cls, val: int) -> int:  # pylint: disable=no-self-use,no-self-argument
-        """Check if the delay used by user is valid. If not, use closest logical values."""
-        if val not in range(0, 11):
-            logging.warning("delay must be within 0 to 10 seconds")
-            if val > 10:
-                val = 10
-            if val < 0:
-                val = 0
+        if not 0 <= val <= 10:
+            raise ValueError(f"Delay must be between 0 and 10 seconds, got {val}")
         return val
 
 
