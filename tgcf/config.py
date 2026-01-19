@@ -273,6 +273,6 @@ def get_SESSION(section: Any = CONFIG.login, default: str = 'tgcf_bot'):
         return default
 
     raise ConfigurationError(
-        "Login information not set!"
+        "Login information not set! "
         "Set either SESSION_STRING or BOT_TOKEN in config file or environment variables."
     )
