@@ -129,7 +129,7 @@ def detect_config_type() -> int:
         stg.mycol = setup_mongo(client)
         return 2
 
-    if CONFIG_FILE_NAME in os.listdir():
+    if os.path.exists(CONFIG_FILE_NAME):
         logging.info(f"{CONFIG_FILE_NAME} detected!")
         return 1
 
