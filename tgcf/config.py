@@ -22,6 +22,11 @@ env_file = os.path.join(pwd, ".env")
 load_dotenv(env_file)
 
 
+class ConfigurationError(Exception):
+    """Raised when configuration is invalid or incomplete."""
+    pass
+
+
 class Forward(BaseModel):
     """Blueprint for the forward object."""
 
@@ -53,13 +58,8 @@ class PastSettings(BaseModel):
     @field_validator("delay")
     @classmethod
     def validate_delay(cls, val: int) -> int:  # pylint: disable=no-self-use,no-self-argument
-        """Check if the delay used by user is valid. If not, use closest logical values."""
-        if val not in range(0, 11):
-            logging.warning("delay must be within 0 to 10 seconds")
-            if val > 10:
-                val = 10
-            if val < 0:
-                val = 0
+        if not 0 <= val <= 10:
+            raise ValueError(f"Delay must be between 0 and 10 seconds, got {val}")
         return val
 
 
@@ -118,24 +118,23 @@ def write_config_to_file(config: Config):
 
 
 def detect_config_type() -> int:
-    if os.getenv("MONGO_CON_STR"):
-        if MONGO_CON_STR:
-            logging.info("Using mongo db for storing config!")
-            client = MongoClient(MONGO_CON_STR)
-            stg.mycol = setup_mongo(client)
+    if MONGO_CON_STR:
+        logging.info("Using mongo db for storing config!")
+        client = MongoClient(MONGO_CON_STR)
+        stg.mycol = setup_mongo(client)
         return 2
-    if CONFIG_FILE_NAME in os.listdir():
+
+    if os.path.exists(CONFIG_FILE_NAME):
         logging.info(f"{CONFIG_FILE_NAME} detected!")
         return 1
 
-    else:
-        logging.info(
-            "config file not found. mongo not found. creating local config file."
-        )
-        cfg = Config()
-        write_config_to_file(cfg)
-        logging.info(f"{CONFIG_FILE_NAME} created!")
-        return 1
+    logging.info(
+        "Config file not found. Creating local config file."
+    )
+    cfg = Config()
+    write_config_to_file(cfg)
+    logging.info(f"{CONFIG_FILE_NAME} created!")
+    return 1
 
 
 def read_config() -> Config:
@@ -163,16 +162,6 @@ def write_config(config: Config):
     elif stg.CONFIG_TYPE == 2:
         update_db(config)
 
-
-def get_env_var(name: str, optional: bool = False) -> str:
-    """Fetch an env var."""
-    var = os.getenv(name, "")
-
-    while not var:
-        if optional:
-            return ""
-        var = input(f"Enter {name}: ")
-    return var
 
 # TODO: replace with telethon's get_peer_id when that gets fixed
 async def get_id(client: TelegramClient, peer):
@@ -262,6 +251,7 @@ MONGO_CON_STR = os.getenv("MONGO_CON_STR")
 MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tgcf-config")
 MONGO_COL_NAME = os.getenv("MONGO_COL_NAME", "tgcf-instance-0")
 
+# CONFIG_TYPE = 0: default, 1: file, 2: mongo
 stg.CONFIG_TYPE = detect_config_type()
 CONFIG = read_config()
 
@@ -277,11 +267,12 @@ logging.info("config.py got executed")
 def get_SESSION(section: Any = CONFIG.login, default: str = 'tgcf_bot'):
     if section.SESSION_STRING and section.user_type == 1:
         logging.info("using session string")
-        SESSION = StringSession(section.SESSION_STRING)
+        return StringSession(section.SESSION_STRING)
     elif section.BOT_TOKEN and section.user_type == 0:
         logging.info("using bot account")
-        SESSION = default
-    else:
-        logging.warning("Login information not set!")
-        sys.exit()
-    return SESSION
+        return default
+
+    raise ConfigurationError(
+        "Login information not set! "
+        "Set either SESSION_STRING or BOT_TOKEN in config file or environment variables."
+    )
