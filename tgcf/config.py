@@ -8,11 +8,9 @@ import tempfile
 
 from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
-from pymongo import MongoClient
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
-from tgcf import storage as stg
 from tgcf.const import CONFIG_FILE_NAME
 from tgcf.plugin_models import PluginConfig
 
@@ -98,7 +96,7 @@ class Config(BaseModel):
     bot_messages: BotMessages = BotMessages()
 
 
-def write_config_to_file(config: Config):
+def write_config(config: Config):
     """Write config atomically to prevent corruption on crash."""
     data = config.model_dump_json()
 
@@ -117,50 +115,29 @@ def write_config_to_file(config: Config):
     os.replace(tmp.name, CONFIG_FILE_NAME)
 
 
-def detect_config_type() -> int:
-    if MONGO_CON_STR:
-        logging.info("Using mongo db for storing config!")
-        client = MongoClient(MONGO_CON_STR)
-        stg.mycol = setup_mongo(client)
-        return 2
-
+def ensure_config_exists():
+    """Create default config file if it doesn't exist."""
     if os.path.exists(CONFIG_FILE_NAME):
         logging.info(f"{CONFIG_FILE_NAME} detected!")
-        return 1
+        return
 
-    logging.info(
-        "Config file not found. Creating local config file."
-    )
+    logging.info("Config file not found. Creating default config.")
     cfg = Config()
-    write_config_to_file(cfg)
+    write_config(cfg)
     logging.info(f"{CONFIG_FILE_NAME} created!")
-    return 1
 
 
 def read_config() -> Config:
-    """Load the configuration defined by user."""
-    if stg.CONFIG_TYPE == 1:
-        try:
-            with open(CONFIG_FILE_NAME, encoding="utf8") as file:
-                return Config.model_validate_json(file.read())
-        except FileNotFoundError:
-            logging.warning(f"{CONFIG_FILE_NAME} not found, using default config")
-            return Config()
-        except Exception as err:
-            logging.error(f"Failed to parse {CONFIG_FILE_NAME}: {err}")
-            raise
-    elif stg.CONFIG_TYPE == 2:
-        return read_db()
-    else:
+    """Load the configuration from file."""
+    try:
+        with open(CONFIG_FILE_NAME, encoding="utf8") as file:
+            return Config.model_validate_json(file.read())
+    except FileNotFoundError:
+        logging.warning(f"{CONFIG_FILE_NAME} not found, using default config")
         return Config()
-
-
-def write_config(config: Config):
-    """Write changes in config back to file."""
-    if stg.CONFIG_TYPE == 1 or stg.CONFIG_TYPE == 0:
-        write_config_to_file(config)
-    elif stg.CONFIG_TYPE == 2:
-        update_db(config)
+    except Exception as err:
+        logging.error(f"Failed to parse {CONFIG_FILE_NAME}: {err}")
+        raise
 
 
 # TODO: replace with telethon's get_peer_id when that gets fixed
@@ -224,35 +201,10 @@ async def load_admins(client: TelegramClient):
     return ADMINS
 
 
-def setup_mongo(client):
-
-    mydb = client[MONGO_DB_NAME]
-    mycol = mydb[MONGO_COL_NAME]
-    if not mycol.find_one({"_id": 0}):
-        mycol.insert_one({"_id": 0, "author": "tgcf", "config": Config().model_dump()})
-
-    return mycol
-
-
-def update_db(cfg):
-    stg.mycol.update_one({"_id": 0}, {"$set": {"config": cfg.model_dump()}})
-
-
-def read_db():
-    obj = stg.mycol.find_one({"_id": 0})
-    cfg = Config(**obj["config"])
-    return cfg
-
-
 PASSWORD = os.getenv("PASSWORD", "tgcf")
 ADMINS = []
 
-MONGO_CON_STR = os.getenv("MONGO_CON_STR")
-MONGO_DB_NAME = os.getenv("MONGO_DB_NAME", "tgcf-config")
-MONGO_COL_NAME = os.getenv("MONGO_COL_NAME", "tgcf-instance-0")
-
-# CONFIG_TYPE = 0: default, 1: file, 2: mongo
-stg.CONFIG_TYPE = detect_config_type()
+ensure_config_exists()
 CONFIG = read_config()
 
 if PASSWORD == "tgcf":
