@@ -130,7 +130,6 @@ for a long time.
 
 Here are some guides for deployment to different cloud providers.
 
-- [Heroku](https://github.com/aahnik/tgcf/wiki/Deploy-to-Heroku)
 - [Digital Ocean](https://github.com/aahnik/tgcf/wiki/Deploy-to-Digital-Ocean)
 - [Gitpod](https://github.com/aahnik/tgcf/wiki/Run-for-free-on-Gitpod")
 - [Python Anywhere](https://github.com/aahnik/tgcf/wiki/Run-on-PythonAnywhere)
