@@ -289,7 +289,6 @@ async def forward_album(
     """Forward an entire album to destinations.
 
     Uses native Telegram forward to preserve album structure with 'Forwarded from' tag.
-    Falls back to anonymous sending if forwarding fails.
     
     Args:
         client: Telegram client
@@ -429,6 +428,7 @@ async def send_single_message_with_fallback(
     client: TelegramClient,
     message: Message,
     dest: int,
+    config: Config
 ) -> None:
     """Send a single message to destination, with fallback for protected content.
 
@@ -443,7 +443,7 @@ async def send_single_message_with_fallback(
 
     # Try send_message first (faster for non-protected channels)
     try:
-        await send_message(dest, tm)
+        await send_message(dest, tm, config)
         logging.info(f"Sent message to {dest} (direct)")
         return
     except Exception as err:
@@ -558,6 +558,7 @@ async def forward_by_link(
     client: TelegramClient,
     url: str,
     destinations: list[int | str],
+    config: Config
 ) -> None:
     """Forward a message or album by its Telegram post link.
 
@@ -568,6 +569,7 @@ async def forward_by_link(
         client: Authenticated TelegramClient
         url: Telegram post link
         destinations: List of destination chat IDs or usernames
+        config: Config
     """
     parsed = parse_telegram_link(url)
     if not parsed:
@@ -594,6 +596,6 @@ async def forward_by_link(
     else:
         for dest in dest_ids:
             try:
-                await send_single_message_with_fallback(client, message, dest)
+                await send_single_message_with_fallback(client, message, dest, config)
             except Exception as err:
                 logging.error(f"Failed to send message to {dest}: {err}")

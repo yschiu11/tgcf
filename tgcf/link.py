@@ -41,6 +41,7 @@ async def forward_link_job(url: str, destinations: list[str]) -> None:
                 client=client,
                 url=url,
                 destinations=destinations,
+                config=config
             )
             logging.info("Send complete!")
         except ValueError as err:

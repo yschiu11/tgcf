@@ -47,8 +47,8 @@ def make_forward_command_handler(ctx: TgcfContext):
             forward = Forward(**parsed_args)
             try:
                 remove_source(forward.source, ctx.config.forwards)
-            except:
-                pass
+            except Exception as err:
+                logging.error(err)
             ctx.config.forwards.append(forward)
             ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
 

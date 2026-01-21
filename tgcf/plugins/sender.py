@@ -17,15 +17,15 @@ class TgcfSender(TgcfPlugin):
         """
         config = read_config()
         sender = TelegramClient(
-            get_SESSION(self.data, 'tgcf_sender'),
+            get_SESSION(config.login, 'tgcf_sender'),
             config.login.API_ID,
             config.login.API_HASH,
         )
-        if self.data.user_type == 0:
-            if self.data.BOT_TOKEN == "":
+        if config.login.user_type == 0:
+            if config.login.BOT_TOKEN == "":
                 logging.warning("[Sender] Bot token not found, but login type is set to bot.")
                 sys.exit()
-            await sender.start(bot_token=self.data.BOT_TOKEN)
+            await sender.start(bot_token=config.login.BOT_TOKEN)
         else:
             await sender.start()
         self.sender = sender

@@ -10,7 +10,6 @@ from telethon.tl.custom.message import Message
 from tgcf import const
 from tgcf.bot import get_events
 from tgcf.config import (
-    Config,
     read_config,
     ensure_config_exists,
     get_SESSION,
@@ -19,7 +18,7 @@ from tgcf.config import (
 )
 from tgcf.context import TgcfContext
 from tgcf.plugins import apply_plugins, load_async_plugins
-from tgcf.storage import EventUid, DummyEvent
+from tgcf.storage import EventUid
 from tgcf.utils import (
     send_message,
     send_album,
@@ -93,10 +92,6 @@ def make_new_message_handler(ctx: TgcfContext):
         tm = await apply_plugins(message, ctx.config.plugins)
         if not tm:
             return
-
-        if event.is_reply:
-            r_event = DummyEvent(chat_id, event.reply_to_msg_id)
-            r_event_uid = EventUid(r_event)
 
         # Initialize buffer for this chat if needed
         if chat_id not in ctx.album_buffers:
