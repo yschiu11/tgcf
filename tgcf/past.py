@@ -11,8 +11,14 @@ from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError
 from telethon.tl.patched import MessageService
 
-from tgcf import config
-from tgcf.config import CONFIG, get_SESSION, write_config
+from tgcf.config import (
+    ensure_config_exists,
+    read_config,
+    get_SESSION,
+    write_config,
+    load_from_to,
+)
+from tgcf.context import TgcfContext
 from tgcf.plugins import apply_plugins, load_async_plugins
 from tgcf.utils import (
     AlbumBuffer,
@@ -22,7 +28,7 @@ from tgcf.utils import (
 
 
 async def process_buffered_messages(
-    client: TelegramClient,
+    ctx: TgcfContext,
     album_buffer: AlbumBuffer,
     destinations: list[int]
 ) -> None:
@@ -30,17 +36,22 @@ async def process_buffered_messages(
 
     Handles both albums (multiple messages) and single buffered messages.
     Clears the buffer after processing.
+    
+    Args:
+        ctx: TgcfContext with config and stored
+        album_buffer: Buffer containing messages to forward
+        destinations: List of destination chat IDs
     """
     if album_buffer.is_empty():
         return
 
     if album_buffer.is_album():
         # Multiple messages = true album, forward as batch
-        await send_album(client, album_buffer, destinations)
+        await send_album(ctx.client, album_buffer, destinations, ctx.config, ctx.stored)
     else:
         # Single message from buffer, forward individually
         tm = album_buffer.get_messages()[0]
-        await forward_single_message(tm, destinations)
+        await forward_single_message(tm, destinations, ctx.config, ctx.stored)
 
     album_buffer.clear()
 
@@ -49,23 +60,29 @@ async def forward_job() -> None:
     """
     Forward all existing messages in the concerned chats.
     """
-    # Load async plugins defined in plugin_models
-    await load_async_plugins()
+    # Load config and create context
+    ensure_config_exists()
+    config = read_config()
+    ctx = TgcfContext(config=config)
+    
+    # Load async plugins
+    await load_async_plugins(config.plugins)
 
-    if CONFIG.login.user_type != 1:
+    if config.login.user_type != 1:
         logging.warning(
             "You cannot use bot account for tgcf past mode. "
             "Telegram does not allow bots to access chat history."
         )
         return
 
-    SESSION = get_SESSION()
+    session = get_SESSION(config.login)
     async with TelegramClient(
-        SESSION, CONFIG.login.API_ID, CONFIG.login.API_HASH
+        session, config.login.API_ID, config.login.API_HASH
     ) as client:
-        config.from_to = await config.load_from_to(client, config.CONFIG.forwards)
+        ctx.client = client
+        ctx.from_to = await load_from_to(client, config.forwards)
 
-        for from_to, forward in zip(config.from_to.items(), config.CONFIG.forwards):
+        for from_to, forward in zip(ctx.from_to.items(), config.forwards):
             src, dest = from_to
             album_buffer = AlbumBuffer()
 
@@ -84,13 +101,13 @@ async def forward_job() -> None:
 
                     try:
                         # Apply plugins to transform the message
-                        tm = await apply_plugins(message)
+                        tm = await apply_plugins(message, config.plugins)
                         if not tm:
                             continue
 
                         # Check if we should flush the current album buffer
                         if album_buffer.should_flush(message.grouped_id):
-                            await process_buffered_messages(client, album_buffer, dest)
+                            await process_buffered_messages(ctx, album_buffer, dest)
 
                         # Process current message
                         if message.grouped_id:
@@ -98,15 +115,15 @@ async def forward_job() -> None:
                             album_buffer.add_message(tm)
                         else:
                             # This is a standalone message, forward it immediately
-                            await forward_single_message(tm, dest)
+                            await forward_single_message(tm, dest, ctx.config, ctx.stored)
                             tm.clear()
 
                         # Update tracking in memory; persisted in finally block
                         forward.offset = message.id
 
                         # Rate limiting delay
-                        await asyncio.sleep(CONFIG.past.delay)
-                        logging.info(f"Slept for {CONFIG.past.delay} seconds")
+                        await asyncio.sleep(config.past.delay)
+                        logging.info(f"Slept for {config.past.delay} seconds")
 
                     except FloodWaitError as fwe:
                         logging.info(f"Sleeping for {fwe}")
@@ -115,8 +132,8 @@ async def forward_job() -> None:
                         logging.exception(err)
             finally:
                 # Forward any remaining buffered album at the end
-                await process_buffered_messages(client, album_buffer, dest)
+                await process_buffered_messages(ctx, album_buffer, dest)
 
                 logging.info(f"Completed forwarding from {src} to {dest}")
 
-                write_config(CONFIG)
+                write_config(config)

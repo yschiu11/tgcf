@@ -194,33 +194,24 @@ async def load_from_to(
     return from_to_dict
 
 
-async def load_admins(client: TelegramClient):
-    for admin in CONFIG.admins:
-        ADMINS.append(await get_id(client, admin))
-    logging.info(f"Loaded admins are {ADMINS}")
-    return ADMINS
+async def load_admins(client: TelegramClient, admins: list[int | str]) -> list[int]:
+    """Resolve admin usernames/IDs to integer IDs."""
+    resolved = [await get_id(client, admin) for admin in admins]
+    logging.info(f"Loaded admins are {resolved}")
+    return resolved
 
 
-PASSWORD = os.getenv("PASSWORD", "tgcf")
-ADMINS = []
-
-ensure_config_exists()
-CONFIG = read_config()
-
-if PASSWORD == "tgcf":
-    logging.warning(
-        "You have not set a password to protect the web access to tgcf.\nThe default password `tgcf` is used."
-    )
-from_to = {}
-is_bot: Optional[bool] = None
-logging.info("config.py got executed")
-
-
-def get_SESSION(section: Any = CONFIG.login, default: str = 'tgcf_bot'):
-    if section.SESSION_STRING and section.user_type == 1:
+def get_SESSION(login: LoginConfig, default: str = 'tgcf_bot'):
+    """Get session for Telegram client.
+    
+    Args:
+        login: LoginConfig section from config
+        default: Default session name for bot accounts
+    """
+    if login.SESSION_STRING and login.user_type == 1:
         logging.info("using session string")
-        return StringSession(section.SESSION_STRING)
-    elif section.BOT_TOKEN and section.user_type == 0:
+        return StringSession(login.SESSION_STRING)
+    elif login.BOT_TOKEN and login.user_type == 0:
         logging.info("using bot account")
         return default
 

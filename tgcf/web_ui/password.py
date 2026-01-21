@@ -1,4 +1,15 @@
-from tgcf.config import PASSWORD
+import logging
+import os
+
+
+# Web UI password - read from environment with default fallback
+PASSWORD = os.getenv("PASSWORD", "tgcf")
+
+if PASSWORD == "tgcf":
+    logging.warning(
+        "You have not set a password to protect the web access to tgcf.\n"
+        "The default password `tgcf` is used."
+    )
 
 
 def check_password(st):

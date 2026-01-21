@@ -3,7 +3,7 @@ import os
 import streamlit as st
 import yaml
 
-from tgcf.config import CONFIG, read_config, write_config
+from tgcf.config import read_config, write_config
 from tgcf.plugin_models import FileType, Replace, Style
 from tgcf.web_ui.password import check_password
 from tgcf.web_ui.utils import get_list, get_string, hide_st, switch_theme

@@ -4,22 +4,26 @@ from typing import List
 
 from telethon import events
 
-from tgcf import config
 from tgcf.config import Forward
 
 
-def admin_protect(org_func):
-    """Decorate to restrict non admins from accessing the bot."""
+def make_admin_protect(ctx):
+    """Factory to create admin_protect decorator with context closure."""
 
-    async def wrapper_func(event):
-        """Wrap the original function."""
-        logging.info(f"Applying admin protection! Admins are {config.ADMINS}")
-        if event.sender_id not in config.ADMINS:
-            await event.respond("You are not authorized.")
-            raise events.StopPropagation
-        return await org_func(event)
+    def admin_protect(org_func):
+        """Decorate to restrict non admins from accessing the bot."""
 
-    return wrapper_func
+        async def wrapper_func(event):
+            """Wrap the original function."""
+            logging.info(f"Applying admin protection! Admins are {ctx.admins}")
+            if event.sender_id not in ctx.admins:
+                await event.respond("You are not authorized.")
+                raise events.StopPropagation
+            return await org_func(event)
+
+        return wrapper_func
+
+    return admin_protect
 
 
 def get_args(text: str) -> str:
@@ -60,7 +64,12 @@ def remove_source(source, forwards: List[Forward]) -> List[Forward]:
     raise ValueError("The source does not exist")
 
 
-def get_command_prefix():
-    if config.is_bot is None:
-        raise ValueError("config.is_bot is not set!")
-    return "/" if config.is_bot else "\."
+def get_command_prefix(ctx) -> str:
+    """Get command prefix based on whether running as bot or user.
+    
+    Args:
+        ctx: TgcfContext with is_bot set
+    """
+    if ctx.is_bot is None:
+        raise ValueError("ctx.is_bot is not set!")
+    return "/" if ctx.is_bot else r"\."
