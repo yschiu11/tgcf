@@ -12,11 +12,9 @@ from typing import Any, Dict
 
 from telethon.tl.custom.message import Message
 
-from tgcf.config import CONFIG
-from tgcf.plugin_models import FileType, ASYNC_PLUGIN_IDS
+from tgcf.config import Config
+from tgcf.plugin_models import FileType, ASYNC_PLUGIN_IDS, PluginConfig
 from tgcf.utils import cleanup, stamp
-
-PLUGINS = CONFIG.plugins
 
 
 class TgcfMessage:
@@ -66,10 +64,14 @@ class TgcfPlugin:
         return tm
 
 
-def load_plugins() -> Dict[str, TgcfPlugin]:
-    """Load the plugins specified in config."""
+def load_plugins(plugin_config: PluginConfig) -> dict[str, TgcfPlugin]:
+    """Load the plugins specified in config.
+    
+    Args:
+        plugin_config: PluginConfig from Config object
+    """
     _plugins = {}
-    for item in PLUGINS:
+    for item in plugin_config:
         plugin_id = item[0]
         if item[1].check == False:
             continue
@@ -104,8 +106,28 @@ def load_plugins() -> Dict[str, TgcfPlugin]:
     return _plugins
 
 
-async def load_async_plugins() -> None:
-    """Load async plugins specified plugin_models."""
+# Module-level plugins cache - initialized lazily
+_plugins: dict[str, TgcfPlugin] | None = None
+
+
+def get_plugins(plugin_config: PluginConfig) -> dict[str, TgcfPlugin]:
+    """Get or initialize plugins from config.
+    
+    Plugins are loaded once and cached for the lifetime of the process.
+    """
+    global _plugins
+    if _plugins is None:
+        _plugins = load_plugins(plugin_config)
+    return _plugins
+
+
+async def load_async_plugins(plugin_config: PluginConfig) -> None:
+    """Load async plugins specified in plugin_models.
+    
+    Args:
+        plugin_config: PluginConfig from Config object
+    """
+    plugins = get_plugins(plugin_config)
     if plugins:
         for id in ASYNC_PLUGIN_IDS:
             if id in plugins:
@@ -113,12 +135,17 @@ async def load_async_plugins() -> None:
                 logging.info(f"Plugin {id} asynchronously loaded")
 
 
-async def apply_plugins(message: Message) -> TgcfMessage | None:
+async def apply_plugins(message: Message, plugin_config: PluginConfig) -> TgcfMessage | None:
     """Apply all loaded plugins to a message.
 
     Return None if message should be dropped (filtered or plugin failure).
+    
+    Args:
+        message: The Telethon message object
+        plugin_config: PluginConfig from Config object
     """
     tm = TgcfMessage(message)
+    plugins = get_plugins(plugin_config)
 
     for _id, plugin in plugins.items():
         try:
@@ -138,6 +165,3 @@ async def apply_plugins(message: Message) -> TgcfMessage | None:
         logging.info(f"Applied plugin {_id}")
 
     return tm
-
-
-plugins = load_plugins()

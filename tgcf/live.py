@@ -3,16 +3,23 @@
 import asyncio
 import logging
 import sys
-from typing import Dict, Optional, Union
 
 from telethon import TelegramClient, events, functions, types
 from telethon.tl.custom.message import Message
 
-from tgcf import config, const
-from tgcf import storage as st
+from tgcf import const
 from tgcf.bot import get_events
-from tgcf.config import CONFIG, get_SESSION
+from tgcf.config import (
+    Config,
+    read_config,
+    ensure_config_exists,
+    get_SESSION,
+    load_from_to,
+    load_admins,
+)
+from tgcf.context import TgcfContext
 from tgcf.plugins import apply_plugins, load_async_plugins
+from tgcf.storage import EventUid, DummyEvent
 from tgcf.utils import (
     send_message,
     send_album,
@@ -20,210 +27,219 @@ from tgcf.utils import (
     forward_single_message,
 )
 
-# Per-chat album buffers and flush tasks for managing concurrent albums
-_album_buffers: Dict[int, AlbumBuffer] = {}
-_flush_tasks: Dict[int, asyncio.Task] = {}
 
-
-async def _flush_album(chat_id: int, client: TelegramClient, destinations: list[int]) -> None:
+async def _flush_album(
+    ctx: TgcfContext,
+    chat_id: int,
+    destinations: list[int],
+) -> None:
     """Flush the buffered album for a specific chat after timeout."""
-    buffer = _album_buffers.get(chat_id)
+    buffer = ctx.album_buffers.get(chat_id)
     if buffer and not buffer.is_empty():
         if buffer.is_album():
-            await send_album(client, buffer, destinations)
+            await send_album(ctx.client, buffer, destinations, ctx.config, ctx.stored)
         else:
             tm = buffer.get_messages()[0]
-            await forward_single_message(tm, destinations)
+            await forward_single_message(tm, destinations, ctx.config, ctx.stored)
         buffer.clear()
 
     # Clean up the flush task
-    if chat_id in _flush_tasks:
-        del _flush_tasks[chat_id]
+    if chat_id in ctx.flush_tasks:
+        del ctx.flush_tasks[chat_id]
 
 
 def _schedule_album_flush(
+    ctx: TgcfContext,
     chat_id: int,
-    client: TelegramClient,
     destinations: list[int],
-    timeout: Optional[float] = None,
 ) -> None:
-    """Schedule or reschedule the album flush timeout for a chat.
+    """Schedule or reschedule the album flush timeout for a chat."""
+    timeout = ctx.config.live.album_flush_timeout
 
-    Args:
-        chat_id: Source chat ID
-        client: Telegram client for forwarding
-        destinations: List of destination chat IDs
-        timeout: Seconds to wait before flushing. If None, use CONFIG.live.album_flush_timeout
-    """
-    if timeout is None:
-        timeout = CONFIG.live.album_flush_timeout
     # Cancel existing flush task if any
-    if chat_id in _flush_tasks:
-        _flush_tasks[chat_id].cancel()
+    if chat_id in ctx.flush_tasks:
+        ctx.flush_tasks[chat_id].cancel()
 
     # Schedule new flush task
     async def _timeout_wrapper():
         try:
             await asyncio.sleep(timeout)
-            await _flush_album(chat_id, client, destinations)
+            await _flush_album(ctx, chat_id, destinations)
         except asyncio.CancelledError:
             logging.debug(f"Album flush task cancelled for chat {chat_id}")
 
-    _flush_tasks[chat_id] = asyncio.create_task(_timeout_wrapper())
+    ctx.flush_tasks[chat_id] = asyncio.create_task(_timeout_wrapper())
 
 
-async def new_message_handler(event: Union[Message, events.NewMessage]) -> None:
-    """Process new incoming messages with album buffering support."""
-    chat_id = event.chat_id
+def make_new_message_handler(ctx: TgcfContext):
+    """Factory that creates a new message handler with context closure."""
+    
+    async def handler(event: Message | events.NewMessage) -> None:
+        """Process new incoming messages with album buffering support."""
+        chat_id = event.chat_id
 
-    if chat_id not in config.from_to:
-        return
-    logging.info(f"New message received in {chat_id}")
-    message = event.message
+        if chat_id not in ctx.from_to:
+            return
+        logging.info(f"New message received in {chat_id}")
+        message = event.message
 
-    event_uid = st.EventUid(event)
+        event_uid = EventUid(event)
 
-    length = len(st.stored)
-    exceeding = length - const.KEEP_LAST_MANY
+        # Prune old stored entries
+        ctx.prune_stored(const.KEEP_LAST_MANY)
 
-    if exceeding > 0:
-        keys_to_delete = list(st.stored.keys())[:exceeding]
-        for key in keys_to_delete:
-            del st.stored[key]
+        dest = ctx.from_to.get(chat_id)
 
-    dest = config.from_to.get(chat_id)
+        tm = await apply_plugins(message, ctx.config.plugins)
+        if not tm:
+            return
 
-    tm = await apply_plugins(message)
-    if not tm:
-        return
+        if event.is_reply:
+            r_event = DummyEvent(chat_id, event.reply_to_msg_id)
+            r_event_uid = EventUid(r_event)
 
-    if event.is_reply:
-        r_event = st.DummyEvent(chat_id, event.reply_to_msg_id)
-        r_event_uid = st.EventUid(r_event)
+        # Initialize buffer for this chat if needed
+        if chat_id not in ctx.album_buffers:
+            ctx.album_buffers[chat_id] = AlbumBuffer()
 
-    # Initialize buffer for this chat if needed
-    if chat_id not in _album_buffers:
-        _album_buffers[chat_id] = AlbumBuffer()
+        buffer = ctx.album_buffers[chat_id]
 
-    buffer = _album_buffers[chat_id]
+        # Check if we need to flush the current buffer due to group ID change
+        if buffer.should_flush(message.grouped_id):
+            # Cancel pending flush task to prevent duplicate flush
+            if chat_id in ctx.flush_tasks:
+                ctx.flush_tasks[chat_id].cancel()
+            # Flush existing album before processing new message
+            await _flush_album(ctx, chat_id, dest)
 
-    # Check if we need to flush the current buffer due to group ID change
-    if buffer.should_flush(message.grouped_id):
-        # Cancel pending flush task to prevent duplicate flush
-        if chat_id in _flush_tasks:
-            _flush_tasks[chat_id].cancel()
-        # Flush existing album before processing new message
-        await _flush_album(chat_id, event.client, dest)
+        # Add message to buffer
+        if message.grouped_id:
+            # This message is part of an album, buffer it
+            # Pre-create storage entry so edit/delete handlers can find it
+            ctx.stored[event_uid] = {}
+            buffer.add_message(tm)
+            # Schedule flush after timeout in case no more messages arrive
+            _schedule_album_flush(ctx, chat_id, dest)
+        else:
+            # Standalone message, forward immediately
+            ctx.stored[event_uid] = {}
+            await forward_single_message(tm, dest, ctx.config, ctx.stored)
+            tm.clear()
 
-    # Add message to buffer
-    if message.grouped_id:
-        # This message is part of an album, buffer it
-        # Pre-create storage entry so edit/delete handlers can find it
-        st.stored[event_uid] = {}
-        buffer.add_message(tm)
-        # Schedule flush after timeout in case no more messages arrive
-        _schedule_album_flush(chat_id, event.client, dest)
-    else:
-        # Standalone message, forward immediately
-        st.stored[event_uid] = {}
-        await forward_single_message(tm, dest)
+    return handler
+
+
+def make_edited_message_handler(ctx: TgcfContext):
+    """Factory that creates an edited message handler with context closure."""
+
+    async def handler(event) -> None:
+        """Handle message edits."""
+        message = event.message
+        chat_id = event.chat_id
+
+        if chat_id not in ctx.from_to:
+            return
+
+        logging.info(f"Message edited in {chat_id}")
+
+        event_uid = EventUid(event)
+
+        tm = await apply_plugins(message, ctx.config.plugins)
+
+        if not tm:
+            return
+
+        fwded_msgs = ctx.stored.get(event_uid)
+
+        if fwded_msgs:
+            for _, msg in fwded_msgs.items():
+                if ctx.config.live.delete_on_edit == message.text:
+                    await msg.delete()
+                    await message.delete()
+                else:
+                    await msg.edit(tm.text)
+            return
+
+        dest = ctx.from_to.get(chat_id)
+
+        for d in dest:
+            await send_message(d, tm, ctx.config)
         tm.clear()
 
+    return handler
 
-async def edited_message_handler(event) -> None:
-    """Handle message edits."""
-    message = event.message
 
-    chat_id = event.chat_id
+def make_deleted_message_handler(ctx: TgcfContext):
+    """Factory that creates a deleted message handler with context closure."""
 
-    if chat_id not in config.from_to:
-        return
+    async def handler(event) -> None:
+        """Handle message deletes."""
+        chat_id = event.chat_id
+        if chat_id not in ctx.from_to:
+            return
 
-    logging.info(f"Message edited in {chat_id}")
+        logging.info(f"Message deleted in {chat_id}")
 
-    event_uid = st.EventUid(event)
-
-    tm = await apply_plugins(message)
-
-    if not tm:
-        return
-
-    fwded_msgs = st.stored.get(event_uid)
-
-    if fwded_msgs:
-        for _, msg in fwded_msgs.items():
-            if config.CONFIG.live.delete_on_edit == message.text:
+        event_uid = EventUid(event)
+        fwded_msgs = ctx.stored.get(event_uid)
+        if fwded_msgs:
+            for _, msg in fwded_msgs.items():
                 await msg.delete()
-                await message.delete()
-            else:
-                await msg.edit(tm.text)
-        return
+            return
 
-    dest = config.from_to.get(chat_id)
-
-    for d in dest:
-        await send_message(d, tm)
-    tm.clear()
+    return handler
 
 
-async def deleted_message_handler(event):
-    """Handle message deletes."""
-    chat_id = event.chat_id
-    if chat_id not in config.from_to:
-        return
-
-    logging.info(f"Message deleted in {chat_id}")
-
-    event_uid = st.EventUid(event)
-    fwded_msgs = st.stored.get(event_uid)
-    if fwded_msgs:
-        for _, msg in fwded_msgs.items():
-            await msg.delete()
-        return
-
-
-ALL_EVENTS = {
-    "new": (new_message_handler, events.NewMessage()),
-    "edited": (edited_message_handler, events.MessageEdited()),
-    "deleted": (deleted_message_handler, events.MessageDeleted()),
-}
+def get_core_events(ctx: TgcfContext) -> dict:
+    """Get core event handlers with context bound via closures."""
+    return {
+        "new": (make_new_message_handler(ctx), events.NewMessage()),
+        "edited": (make_edited_message_handler(ctx), events.MessageEdited()),
+        "deleted": (make_deleted_message_handler(ctx), events.MessageDeleted()),
+    }
 
 
 async def start_sync() -> None:
     """Start tgcf live sync."""
-    # load async plugins defined in plugin_models
-    await load_async_plugins()
+    # Load async plugins defined in plugin_models
+    ensure_config_exists()
+    config = read_config()
+    await load_async_plugins(config.plugins)
+    ctx = TgcfContext(config=config)
 
-    SESSION = get_SESSION()
-    client = TelegramClient(
-        SESSION,
-        CONFIG.login.API_ID,
-        CONFIG.login.API_HASH,
-        sequential_updates=CONFIG.live.sequential_updates,
+    session = get_SESSION(config.login)
+    ctx.client = TelegramClient(
+        session,
+        config.login.API_ID,
+        config.login.API_HASH,
+        sequential_updates=config.live.sequential_updates,
     )
-    if CONFIG.login.user_type == 0:
-        if CONFIG.login.BOT_TOKEN == "":
+
+    if config.login.user_type == 0:
+        if config.login.BOT_TOKEN == "":
             logging.warning("Bot token not found, but login type is set to bot.")
             sys.exit()
-        await client.start(bot_token=CONFIG.login.BOT_TOKEN)
+        await ctx.client.start(bot_token=config.login.BOT_TOKEN)
     else:
-        await client.start()
-    config.is_bot = await client.is_bot()
-    logging.info(f"config.is_bot={config.is_bot}")
-    command_events = get_events()
+        await ctx.client.start()
 
-    await config.load_admins(client)
+    ctx.is_bot = await ctx.client.is_bot()
+    logging.info(f"ctx.is_bot={ctx.is_bot}")
 
-    ALL_EVENTS.update(command_events)
+    ctx.admins = await load_admins(ctx.client, config.admins)
+    ctx.from_to = await load_from_to(ctx.client, config.forwards)
 
-    for key, val in ALL_EVENTS.items():
-        if config.CONFIG.live.delete_sync is False and key == "deleted":
+    all_events = get_core_events(ctx)
+    command_events = get_events(ctx)
+    all_events.update(command_events)
+    for key, val in all_events.items():
+        if config.live.delete_sync is False and key == "deleted":
             continue
-        client.add_event_handler(*val)
+        ctx.client.add_event_handler(*val)
         logging.info(f"Added event handler for {key}")
 
-    if config.is_bot and const.REGISTER_COMMANDS:
-        await client(
+    if ctx.is_bot and const.REGISTER_COMMANDS:
+        await ctx.client(
             functions.bots.SetBotCommandsRequest(
                 scope=types.BotCommandScopeDefault(),
                 lang_code="en",
@@ -233,5 +249,5 @@ async def start_sync() -> None:
                 ],
             )
         )
-    config.from_to = await config.load_from_to(client, config.CONFIG.forwards)
-    await client.run_until_disconnected()
+
+    await ctx.client.run_until_disconnected()

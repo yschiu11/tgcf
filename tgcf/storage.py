@@ -27,6 +27,3 @@ class DummyEvent:
     def __init__(self, chat_id, msg_id):
         self.chat_id = chat_id
         self.id = msg_id
-
-
-stored: Dict[EventUid, Dict[int, int]] = {}

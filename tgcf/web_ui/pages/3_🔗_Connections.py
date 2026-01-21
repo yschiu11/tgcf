@@ -2,7 +2,7 @@ import time
 
 import streamlit as st
 
-from tgcf.config import CONFIG, Forward, read_config, write_config
+from tgcf.config import Forward, read_config, write_config
 from tgcf.web_ui.password import check_password
 from tgcf.web_ui.utils import get_list, get_string, hide_st, switch_theme
 

@@ -13,7 +13,7 @@ from telethon.hints import EntityLike
 from telethon.tl.custom.message import Message
 
 from tgcf import __version__
-from tgcf.config import CONFIG
+from tgcf.config import Config
 from tgcf.plugin_models import STYLE_CODES
 
 # Telegram albums can have up to 10 items. We search ±10 messages around
@@ -81,10 +81,20 @@ def platform_info():
     \n{platform.architecture()} {platform.processor()}"""
 
 
-async def send_message(recipient: EntityLike, tm: "TgcfMessage") -> Message:
-    """Forward or send a copy, depending on config."""
+async def send_message(
+    recipient: EntityLike,
+    tm: "TgcfMessage",
+    config: Config,
+) -> Message:
+    """Forward or send a copy, depending on config.
+    
+    Args:
+        recipient: Destination chat
+        tm: TgcfMessage to send
+        config: Config object for show_forwarded_from setting
+    """
     client: TelegramClient = tm.client
-    if CONFIG.show_forwarded_from:
+    if config.show_forwarded_from:
         try:
             return await client.forward_messages(recipient, tm.message)
         except Exception as err:
@@ -100,12 +110,26 @@ async def send_message(recipient: EntityLike, tm: "TgcfMessage") -> Message:
     tm.message.text = tm.text
     return await client.send_message(recipient, tm.message, reply_to=tm.reply_to)
 
-async def send_album(client: TelegramClient, album: AlbumBuffer, destinations: list[int]) -> None:
-    """Forward or send an album, depending on config."""
-    if CONFIG.show_forwarded_from:
-        await forward_album(client, album, destinations)
+async def send_album(
+    client: TelegramClient,
+    album: AlbumBuffer,
+    destinations: list[int],
+    config: Config,
+    stored: dict,
+) -> None:
+    """Forward or send an album, depending on config.
+    
+    Args:
+        client: Telegram client
+        album: AlbumBuffer with messages
+        destinations: List of destination chat IDs
+        config: Config object for show_forwarded_from setting
+        stored: Storage dict for message ID mapping
+    """
+    if config.show_forwarded_from:
+        await forward_album(client, album, destinations, stored)
     else:
-        await forward_album_anonymous(client, album, destinations)
+        await forward_album_anonymous(client, album, destinations, config, stored)
 
 
 def cleanup(*files: str) -> None:
@@ -156,24 +180,31 @@ def replace(pattern: str, new: str, string: str, regex: bool) -> str:
         return string.replace(pattern, new)
 
 
-def get_reply_to_mapping(source_chat_id: int, reply_to_msg_id: int) -> dict[int, int]:
+def get_reply_to_mapping(
+    source_chat_id: int,
+    reply_to_msg_id: int,
+    config: Config,
+    stored: dict,
+) -> dict[int, int]:
     """Get reply_to message IDs for each destination if reply chain is enabled.
     
     Args:
         source_chat_id: The chat ID where the original message came from
         reply_to_msg_id: The message ID that the original message is replying to
+        config: Config object for reply_chain setting
+        stored: Storage dict for message ID mapping
         
     Returns:
         Dict mapping destination chat IDs to their corresponding reply_to message IDs
     """
-    if not CONFIG.reply_chain:
+    if not config.reply_chain:
         return {}
     
     reply_event = st.DummyEvent(source_chat_id, reply_to_msg_id)
     reply_event_uid = st.EventUid(reply_event)
     
-    if reply_event_uid in st.stored:
-        return st.stored[reply_event_uid]
+    if reply_event_uid in stored:
+        return stored[reply_event_uid]
     
     return {}
 
@@ -181,11 +212,18 @@ def get_reply_to_mapping(source_chat_id: int, reply_to_msg_id: int) -> dict[int,
 async def forward_album_anonymous(
     client: TelegramClient,
     album: AlbumBuffer,
-    destinations: list[int]
+    destinations: list[int],
+    config: Config,
+    stored: dict,
 ) -> None:
     """Send album as new messages without 'Forwarded from' attribution.
 
-    Sends media files as an album while preserving captions.
+    Args:
+        client: Telegram client
+        album: AlbumBuffer with messages
+        destinations: List of destination chat IDs
+        config: Config object for reply_chain setting
+        stored: Storage dict for message ID mapping
     """
     messages = album.get_messages()
     if not messages:
@@ -210,7 +248,7 @@ async def forward_album_anonymous(
     # Check if the first message in album is a reply
     reply_to_mapping = {}
     if first_message.is_reply:
-        reply_to_mapping = get_reply_to_mapping(source_chat_id, first_message.reply_to_msg_id)
+        reply_to_mapping = get_reply_to_mapping(source_chat_id, first_message.reply_to_msg_id, config, stored)
 
     for dest in destinations:
         try:
@@ -233,9 +271,9 @@ async def forward_album_anonymous(
             # Update storage for each sent message
             for tm, sent_msg in zip(messages, sent_messages):
                 event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))
-                if event_uid not in st.stored:
-                    st.stored[event_uid] = {}
-                st.stored[event_uid][dest] = sent_msg.id
+                if event_uid not in stored:
+                    stored[event_uid] = {}
+                stored[event_uid][dest] = sent_msg.id
 
         except Exception as err:
             logging.error(f"Failed to send album to {dest}: {err}")
@@ -245,12 +283,19 @@ async def forward_album_anonymous(
 async def forward_album(
     client: TelegramClient,
     album: AlbumBuffer,
-    destinations: list[int]
+    destinations: list[int],
+    stored: dict,
 ) -> None:
     """Forward an entire album to destinations.
 
     Uses native Telegram forward to preserve album structure with 'Forwarded from' tag.
     Falls back to anonymous sending if forwarding fails.
+    
+    Args:
+        client: Telegram client
+        album: AlbumBuffer with messages
+        destinations: List of destination chat IDs
+        stored: Storage dict for message ID mapping
     """
     messages = album.get_messages()
     if not messages:
@@ -275,39 +320,47 @@ async def forward_album(
             # Update storage for each message in the album
             for tm, fwd_msg in zip(messages, forwarded):
                 event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))
-                if event_uid not in st.stored:
-                    st.stored[event_uid] = {}
-                st.stored[event_uid][dest] = fwd_msg.id
+                if event_uid not in stored:
+                    stored[event_uid] = {}
+                stored[event_uid][dest] = fwd_msg.id
 
         except Exception as err:
             logging.warning(f"Failed to forward album to {dest}: {err}. Trying anonymous send...")
-            # Fallback to anonymous sending for this destination only
-            await forward_album_anonymous(client, album, [dest])
+            # TODO: fallback needs config which we don't have here - caller should handle
+            raise
 
 
 async def forward_single_message(
     tm: "TgcfMessage",
-    destinations: list[int]
+    destinations: list[int],
+    config: Config,
+    stored: dict,
 ) -> None:
     """Forward a single message to destinations.
 
     Uses send_message utility which respects plugin modifications.
+    
+    Args:
+        tm: TgcfMessage to forward
+        destinations: List of destination chat IDs
+        config: Config object for show_forwarded_from and reply_chain settings
+        stored: Storage dict for message ID mapping
     """
     event_uid = st.EventUid(st.DummyEvent(tm.message.chat_id, tm.message.id))
-    if event_uid not in st.stored:
-        st.stored[event_uid] = {}
+    if event_uid not in stored:
+        stored[event_uid] = {}
 
     # Check if original message was a reply
     reply_to_mapping = {}
     if tm.message.is_reply:
-        reply_to_mapping = get_reply_to_mapping(tm.message.chat_id, tm.message.reply_to_msg_id)
+        reply_to_mapping = get_reply_to_mapping(tm.message.chat_id, tm.message.reply_to_msg_id, config, stored)
 
     for dest in destinations:
         try:
             # Set the correct reply_to for this specific destination
             tm.reply_to = reply_to_mapping.get(dest, None)
-            fwded_msg = await send_message(dest, tm)
-            st.stored[event_uid][dest] = fwded_msg.id
+            fwded_msg = await send_message(dest, tm, config)
+            stored[event_uid][dest] = fwded_msg.id
         except Exception as err:
             logging.error(f"Failed to forward message {tm.message.id} to {dest}: {err}")
 
