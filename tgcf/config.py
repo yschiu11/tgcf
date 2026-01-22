@@ -6,18 +6,12 @@ import sys
 from typing import Dict, List, Optional, Union, Any
 import tempfile
 
-from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 from tgcf.const import CONFIG_FILE_NAME
 from tgcf.plugin_models import PluginConfig
-
-pwd = os.getcwd()
-env_file = os.path.join(pwd, ".env")
-
-load_dotenv(env_file)
 
 
 class ConfigurationError(Exception):
