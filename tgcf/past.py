@@ -11,15 +11,9 @@ from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError
 from telethon.tl.patched import MessageService
 
-from tgcf.config import (
-    ensure_config_exists,
-    read_config,
-    get_SESSION,
-    write_config,
-    load_from_to,
-)
+from tgcf.config import write_config
 from tgcf.context import TgcfContext
-from tgcf.plugins import apply_plugins, load_async_plugins
+from tgcf.plugins import apply_plugins
 from tgcf.utils import (
     AlbumBuffer,
     send_album,
@@ -56,84 +50,67 @@ async def process_buffered_messages(
     album_buffer.clear()
 
 
-async def forward_job() -> None:
+async def forward_job(ctx: TgcfContext) -> None:
     """
     Forward all existing messages in the concerned chats.
-    """
-    # Load config and create context
-    ensure_config_exists()
-    config = read_config()
-    ctx = TgcfContext(config=config)
     
-    # Load async plugins
-    await load_async_plugins(config.plugins)
+    Args:
+        ctx: Fully-initialized TgcfContext with client and from_to mappings
+    """
+    config = ctx.config
 
-    if config.login.user_type != 1:
-        logging.warning(
-            "You cannot use bot account for tgcf past mode. "
-            "Telegram does not allow bots to access chat history."
-        )
-        return
+    for from_to, forward in zip(ctx.from_to.items(), config.forwards):
+        src, dest = from_to
+        album_buffer = AlbumBuffer()
 
-    session = get_SESSION(config.login)
-    async with TelegramClient(
-        session, config.login.API_ID, config.login.API_HASH
-    ) as client:
-        ctx.client = client
-        ctx.from_to = await load_from_to(client, config.forwards)
+        logging.info(f"Forwarding messages from {src} to {dest}")
 
-        for from_to, forward in zip(ctx.from_to.items(), config.forwards):
-            src, dest = from_to
-            album_buffer = AlbumBuffer()
+        try:
+            async for message in ctx.client.iter_messages(
+                src, reverse=True, offset_id=forward.offset
+            ):
+                if forward.end and message.id > forward.end:
+                    break
 
-            logging.info(f"Forwarding messages from {src} to {dest}")
+                # Skip service messages
+                if isinstance(message, MessageService):
+                    continue
 
-            try:
-                async for message in client.iter_messages(
-                    src, reverse=True, offset_id=forward.offset
-                ):
-                    if forward.end and message.id > forward.end:
-                        break
-
-                    # Skip service messages
-                    if isinstance(message, MessageService):
+                try:
+                    # Apply plugins to transform the message
+                    tm = await apply_plugins(message, config.plugins)
+                    if not tm:
                         continue
 
-                    try:
-                        # Apply plugins to transform the message
-                        tm = await apply_plugins(message, config.plugins)
-                        if not tm:
-                            continue
+                    # Check if we should flush the current album buffer
+                    if album_buffer.should_flush(message.grouped_id):
+                        await process_buffered_messages(ctx, album_buffer, dest)
 
-                        # Check if we should flush the current album buffer
-                        if album_buffer.should_flush(message.grouped_id):
-                            await process_buffered_messages(ctx, album_buffer, dest)
+                    # Process current message
+                    if message.grouped_id:
+                        # This message is part of an album, buffer it
+                        album_buffer.add_message(tm)
+                    else:
+                        # This is a standalone message, forward it immediately
+                        await forward_single_message(tm, dest, ctx.config, ctx.stored)
+                        tm.clear()
 
-                        # Process current message
-                        if message.grouped_id:
-                            # This message is part of an album, buffer it
-                            album_buffer.add_message(tm)
-                        else:
-                            # This is a standalone message, forward it immediately
-                            await forward_single_message(tm, dest, ctx.config, ctx.stored)
-                            tm.clear()
+                    # Update tracking in memory; persisted in finally block
+                    forward.offset = message.id
 
-                        # Update tracking in memory; persisted in finally block
-                        forward.offset = message.id
+                    # Rate limiting delay
+                    await asyncio.sleep(config.past.delay)
+                    logging.info(f"Slept for {config.past.delay} seconds")
 
-                        # Rate limiting delay
-                        await asyncio.sleep(config.past.delay)
-                        logging.info(f"Slept for {config.past.delay} seconds")
+                except FloodWaitError as fwe:
+                    logging.info(f"Sleeping for {fwe}")
+                    await asyncio.sleep(delay=fwe.seconds)
+                except Exception as err:
+                    logging.exception(err)
+        finally:
+            # Forward any remaining buffered album at the end
+            await process_buffered_messages(ctx, album_buffer, dest)
 
-                    except FloodWaitError as fwe:
-                        logging.info(f"Sleeping for {fwe}")
-                        await asyncio.sleep(delay=fwe.seconds)
-                    except Exception as err:
-                        logging.exception(err)
-            finally:
-                # Forward any remaining buffered album at the end
-                await process_buffered_messages(ctx, album_buffer, dest)
+            logging.info(f"Completed forwarding from {src} to {dest}")
 
-                logging.info(f"Completed forwarding from {src} to {dest}")
-
-                write_config(config)
+            write_config(config, ctx.config_path)
