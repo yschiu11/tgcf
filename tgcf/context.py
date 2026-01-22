@@ -12,6 +12,7 @@ class TgcfContext:
     """Runtime state for a tgcf instance."""
     # Immutable config loaded once at startup
     config: Config
+    config_path: str?
 
     # Client connection, set after login
     client: TelegramClient | None = None
