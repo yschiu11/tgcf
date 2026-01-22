@@ -12,7 +12,7 @@ from tgcf.bot.utils import (
     get_command_prefix,
     remove_source,
 )
-from tgcf.config import Forward, load_from_to, write_config
+from tgcf.config import Forward, load_from_to
 from tgcf.context import TgcfContext
 from tgcf.plugin_models import Style
 
@@ -53,7 +53,7 @@ def make_forward_command_handler(ctx: TgcfContext):
             ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
 
             await event.respond("Success")
-            write_config(ctx.config)
+            ctx.save_config()
         except ValueError as err:
             logging.error(err)
             await event.respond(str(err))
@@ -91,7 +91,7 @@ def make_remove_command_handler(ctx: TgcfContext):
             ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
 
             await event.respond("Success")
-            write_config(ctx.config)
+            ctx.save_config()
         except ValueError as err:
             logging.error(err)
             await event.respond(str(err))
@@ -128,7 +128,7 @@ def make_style_command_handler(ctx: TgcfContext):
                 raise ValueError(f"Invalid style. Choose from {_valid}")
             ctx.config.plugins.fmt.style = args
             await event.respond("Success")
-            write_config(ctx.config)
+            ctx.save_config()
         except ValueError as err:
             logging.error(err)
             await event.respond(str(err))

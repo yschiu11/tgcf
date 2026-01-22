@@ -2,22 +2,14 @@
 
 import asyncio
 import logging
-import sys
 
 from telethon import TelegramClient, events, functions, types
 from telethon.tl.custom.message import Message
 
 from tgcf import const
 from tgcf.bot import get_events
-from tgcf.config import (
-    read_config,
-    ensure_config_exists,
-    get_SESSION,
-    load_from_to,
-    load_admins,
-)
 from tgcf.context import TgcfContext
-from tgcf.plugins import apply_plugins, load_async_plugins
+from tgcf.plugins import apply_plugins
 from tgcf.storage import EventUid
 from tgcf.utils import (
     send_message,
@@ -194,35 +186,14 @@ def get_core_events(ctx: TgcfContext) -> dict:
     }
 
 
-async def start_sync() -> None:
-    """Start tgcf live sync."""
-    # Load async plugins defined in plugin_models
-    ensure_config_exists()
-    config = read_config()
-    await load_async_plugins(config.plugins)
-    ctx = TgcfContext(config=config)
-
-    session = get_SESSION(config.login)
-    ctx.client = TelegramClient(
-        session,
-        config.login.API_ID,
-        config.login.API_HASH,
-        sequential_updates=config.live.sequential_updates,
-    )
-
-    if config.login.user_type == 0:
-        if config.login.BOT_TOKEN == "":
-            logging.warning("Bot token not found, but login type is set to bot.")
-            sys.exit()
-        await ctx.client.start(bot_token=config.login.BOT_TOKEN)
-    else:
-        await ctx.client.start()
-
-    ctx.is_bot = await ctx.client.is_bot()
+async def start_sync(ctx: TgcfContext) -> None:
+    """Start tgcf live sync.
+    
+    Args:
+        ctx: Fully-initialized TgcfContext with client, from_to, and admins
+    """
+    config = ctx.config
     logging.info(f"ctx.is_bot={ctx.is_bot}")
-
-    ctx.admins = await load_admins(ctx.client, config.admins)
-    ctx.from_to = await load_from_to(ctx.client, config.forwards)
 
     all_events = get_core_events(ctx)
     command_events = get_events(ctx)

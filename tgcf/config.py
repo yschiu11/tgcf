@@ -6,18 +6,12 @@ import sys
 from typing import Dict, List, Optional, Union, Any
 import tempfile
 
-from dotenv import load_dotenv
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 from tgcf.const import CONFIG_FILE_NAME
 from tgcf.plugin_models import PluginConfig
-
-pwd = os.getcwd()
-env_file = os.path.join(pwd, ".env")
-
-load_dotenv(env_file)
 
 
 class ConfigurationError(Exception):
@@ -96,11 +90,16 @@ class Config(BaseModel):
     bot_messages: BotMessages = BotMessages()
 
 
-def write_config(config: Config):
-    """Write config atomically to prevent corruption on crash."""
+def write_config(config: Config, path: str = CONFIG_FILE_NAME) -> None:
+    """Write config atomically to prevent corruption on crash.
+    
+    Args:
+        config: Config object to serialize
+        path: File path to write to (defaults to CONFIG_FILE_NAME)
+    """
     data = config.model_dump_json()
 
-    dir_name = os.path.dirname(CONFIG_FILE_NAME) or "."
+    dir_name = os.path.dirname(path) or "."
     with tempfile.NamedTemporaryFile(
         mode="w",
         encoding="utf8",
@@ -112,31 +111,39 @@ def write_config(config: Config):
         tmp.flush()
         os.fsync(tmp.fileno())
 
-    os.replace(tmp.name, CONFIG_FILE_NAME)
+    os.replace(tmp.name, path)
 
 
-def ensure_config_exists():
-    """Create default config file if it doesn't exist."""
-    if os.path.exists(CONFIG_FILE_NAME):
-        logging.info(f"{CONFIG_FILE_NAME} detected!")
+def ensure_config_exists(path: str = CONFIG_FILE_NAME) -> None:
+    """Create default config file if it doesn't exist.
+
+    Args:
+        path: File path to check/create (defaults to CONFIG_FILE_NAME)
+    """
+    if os.path.exists(path):
+        logging.info(f"{path} detected!")
         return
 
-    logging.info("Config file not found. Creating default config.")
+    logging.info(f"Config file not found. Creating default config at {path}.")
     cfg = Config()
-    write_config(cfg)
-    logging.info(f"{CONFIG_FILE_NAME} created!")
+    write_config(cfg, path)
+    logging.info(f"{path} created!")
 
 
-def read_config() -> Config:
-    """Load the configuration from file."""
+def read_config(path: str = CONFIG_FILE_NAME) -> Config:
+    """Load the configuration from file.
+
+    Args:
+        path: File path to read from (defaults to CONFIG_FILE_NAME)
+    """
     try:
-        with open(CONFIG_FILE_NAME, encoding="utf8") as file:
+        with open(path, encoding="utf8") as file:
             return Config.model_validate_json(file.read())
     except FileNotFoundError:
-        logging.warning(f"{CONFIG_FILE_NAME} not found, using default config")
+        logging.warning(f"{path} not found, using default config")
         return Config()
     except Exception as err:
-        logging.error(f"Failed to parse {CONFIG_FILE_NAME}: {err}")
+        logging.error(f"Failed to parse {path}: {err}")
         raise
 
 
