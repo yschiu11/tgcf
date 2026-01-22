@@ -11,7 +11,6 @@ from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError
 from telethon.tl.patched import MessageService
 
-from tgcf.config import write_config
 from tgcf.context import TgcfContext
 from tgcf.plugins import apply_plugins
 from tgcf.utils import (
@@ -113,4 +112,4 @@ async def forward_job(ctx: TgcfContext) -> None:
 
             logging.info(f"Completed forwarding from {src} to {dest}")
 
-            write_config(config, ctx.config_path)
+            ctx.save_config()

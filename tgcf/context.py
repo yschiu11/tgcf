@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 
 from telethon import TelegramClient
-from tgcf.config import Config
+from tgcf.config import Config, write_config
 from tgcf.storage import EventUid
 from tgcf.utils import AlbumBuffer
 
@@ -38,3 +38,7 @@ class TgcfContext:
         if excess > 0:
             for key in list(self.stored.keys())[:excess]:
                 del self.stored[key]
+
+    def save_config(self) -> None:
+        """Save the config to the config file."""
+        write_config(self.config, self.config_path)
