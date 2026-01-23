@@ -4,10 +4,10 @@ from typing import Dict, List
 from tgcf.web_ui.run import package_dir
 from streamlit.components.v1 import html
 from tgcf.config import read_config, write_config, Config
-from tgcf.const import CONFIG_FILE_NAME
+from tgcf.const import CONFIG_FILE_NAME, CONFIG_ENV_VAR_NAME
 
 def get_config_path() -> str:
-    return os.getenv("TGCF_CONFIG", CONFIG_FILE_NAME)
+    return os.getenv(CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME)
 
 def load_config_to_session() -> Config:
     if "config" not in st.session_state:
@@ -22,6 +22,7 @@ def load_config_to_session() -> Config:
 def save_session_config(config: Config) -> None:
     path = get_config_path()
     write_config(config, path)
+    st.session_state.config = config
 
 def get_list(string: str):
     # string where each line is one element
