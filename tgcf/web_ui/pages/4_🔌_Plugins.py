@@ -3,12 +3,18 @@ import os
 import streamlit as st
 import yaml
 
-from tgcf.config import read_config, write_config
 from tgcf.plugin_models import FileType, Replace, Style
 from tgcf.web_ui.password import check_password
-from tgcf.web_ui.utils import get_list, get_string, hide_st, switch_theme
+from tgcf.web_ui.utils import (
+    get_list,
+    get_string,
+    hide_st,
+    switch_theme,
+    load_config_to_session,
+    save_session_config
+)
 
-CONFIG = read_config()
+CONFIG = load_config_to_session()
 
 st.set_page_config(
     page_title="Plugins",
@@ -207,4 +213,4 @@ if check_password(st):
                 ,unsafe_allow_html=True)
 
     if st.button("Save"):
-        write_config(CONFIG)
+        save_session_config(CONFIG)

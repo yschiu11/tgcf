@@ -5,11 +5,15 @@ import time
 
 import streamlit as st
 
-from tgcf.config import read_config, write_config
 from tgcf.web_ui.password import check_password
-from tgcf.web_ui.utils import hide_st, switch_theme
+from tgcf.web_ui.utils import (
+    hide_st,
+    switch_theme,
+    load_config_to_session,
+    save_session_config
+)
 
-CONFIG = read_config()
+CONFIG = load_config_to_session()
 
 
 def termination():
@@ -20,9 +24,9 @@ def termination():
             "Download last logs", data=f.read(), file_name="tgcf_logs.txt"
         )
 
-    CONFIG = read_config()
+    CONFIG = load_config_to_session()
     CONFIG.pid = 0
-    write_config(CONFIG)
+    save_session_config(CONFIG)
     st.button("Refresh page")
 
 # TODO: Clear streamlit logic
@@ -78,7 +82,7 @@ if check_password(st):
             )
 
         if st.button("Save"):
-            write_config(CONFIG)
+            save_session_config(CONFIG)
 
     check = False
 
@@ -96,7 +100,7 @@ if check_password(st):
             st.code("The process has stopped.")
             st.code(err)
             CONFIG.pid = 0
-            write_config(CONFIG)
+            save_session_config(CONFIG)
             time.sleep(1)
             st.rerun()
 
@@ -108,7 +112,7 @@ if check_password(st):
                 st.code(err)
 
                 CONFIG.pid = 0
-                write_config(CONFIG)
+                save_session_config(CONFIG)
                 st.button("Refresh Page")
 
             else:
@@ -122,7 +126,7 @@ if check_password(st):
                 stderr=subprocess.STDOUT,
             )
         CONFIG.pid = process.pid
-        write_config(CONFIG)
+        save_session_config(CONFIG)
         time.sleep(2)
 
         st.rerun()

@@ -1,9 +1,7 @@
 import streamlit as st
 
-from tgcf.web_ui.utils import hide_st, switch_theme
-from tgcf.config import read_config
-
-CONFIG = read_config()
+from tgcf.web_ui.utils import hide_st, switch_theme, load_config_to_session
+CONFIG = load_config_to_session()
 
 st.set_page_config(
     page_title="Hello",

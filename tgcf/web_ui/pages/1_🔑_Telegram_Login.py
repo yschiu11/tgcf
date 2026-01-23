@@ -1,10 +1,14 @@
 import streamlit as st
 
-from tgcf.config import read_config, write_config
 from tgcf.web_ui.password import check_password
-from tgcf.web_ui.utils import hide_st, switch_theme
+from tgcf.web_ui.utils import (
+    hide_st,
+    switch_theme,
+    load_config_to_session,
+    save_session_config
+)
 
-CONFIG = read_config()
+CONFIG = load_config_to_session()
 
 st.set_page_config(
     page_title="Telegram Login",
@@ -57,4 +61,4 @@ if check_password(st):
             )
 
     if st.button("Save"):
-        write_config(CONFIG)
+        save_session_config(CONFIG)
