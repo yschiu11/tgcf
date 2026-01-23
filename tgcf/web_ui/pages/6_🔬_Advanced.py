@@ -2,12 +2,16 @@ import json
 
 import streamlit as st
 
-from tgcf.config import CONFIG_FILE_NAME, read_config, write_config
 from tgcf.utils import platform_info
 from tgcf.web_ui.password import check_password
-from tgcf.web_ui.utils import hide_st, switch_theme
+from tgcf.web_ui.utils import (
+    hide_st,
+    switch_theme,
+    load_config_to_session,
+    save_session_config
+)
 
-CONFIG = read_config()
+CONFIG = load_config_to_session()
 
 st.set_page_config(
     page_title="Advanced",
@@ -25,11 +29,11 @@ if check_password(st):
             st.code(platform_info())
 
         with st.expander("Configuration"):
-            with open(CONFIG_FILE_NAME, "r") as file:
+            with open(get_config_path(), "r") as file:
                 data = json.loads(file.read())
                 dumped = json.dumps(data, indent=3)
             st.download_button(
-                f"Download config json", data=dumped, file_name=CONFIG_FILE_NAME
+                f"Download config json", data=dumped, file_name=get_config_path()
             )
             st.json(data)
 
@@ -57,4 +61,4 @@ if check_password(st):
                 )
 
             if st.button("Save"):
-                write_config(CONFIG)
+                save_session_config(CONFIG)

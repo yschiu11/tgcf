@@ -1,9 +1,28 @@
 import os
+import streamlit as st
 from typing import Dict, List
 from tgcf.web_ui.run import package_dir
 from streamlit.components.v1 import html
-from tgcf.config import write_config
+from tgcf.config import read_config, write_config, Config
+from tgcf.const import CONFIG_FILE_NAME, CONFIG_ENV_VAR_NAME
 
+def get_config_path() -> str:
+    return os.getenv(CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME)
+
+def load_config_to_session() -> Config:
+    if "config" not in st.session_state:
+        path = get_config_path()
+        try:
+            st.session_state.config = read_config(path)
+        except Exception as err:
+            st.error(f"Failed to load config from {path}: {err}")
+            st.stop()
+    return st.session_state.config
+
+def save_session_config(config: Config) -> None:
+    path = get_config_path()
+    write_config(config, path)
+    st.session_state.config = config
 
 def get_list(string: str):
     # string where each line is one element
@@ -45,7 +64,7 @@ def apply_theme(st,CONFIG,hidden_container):
     else:
         theme = 'Dark'
         CONFIG.theme = 'dark'
-    write_config(CONFIG)
+    save_session_config(CONFIG)
     script = f"<script>localStorage.setItem('stActiveTheme-/-v1', '{{\"name\":\"{theme}\"}}');"
     pages_dir = package_dir / 'pages'
     pages = [p.name for p in pages_dir.iterdir()]

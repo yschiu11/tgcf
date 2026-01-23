@@ -2,11 +2,18 @@ import time
 
 import streamlit as st
 
-from tgcf.config import Forward, read_config, write_config
+from tgcf.config import Forward
 from tgcf.web_ui.password import check_password
-from tgcf.web_ui.utils import get_list, get_string, hide_st, switch_theme
+from tgcf.web_ui.utils import (
+    get_list,
+    get_string,
+    hide_st,
+    switch_theme,
+    load_config_to_session,
+    save_session_config
+)
 
-CONFIG = read_config()
+CONFIG = load_config_to_session()
 
 st.set_page_config(
     page_title="Connections",
@@ -18,7 +25,7 @@ if check_password(st):
     add_new = st.button("Add new connection")
     if add_new:
         CONFIG.forwards.append(Forward())
-        write_config(CONFIG)
+        save_session_config(CONFIG)
 
     num = len(CONFIG.forwards)
 
@@ -105,9 +112,9 @@ if check_password(st):
 
                     if st.button(f"Remove connection **{label}**"):
                         del CONFIG.forwards[i]
-                        write_config(CONFIG)
+                        save_session_config(CONFIG)
                         st.rerun()
 
     if st.button("Save"):
-        write_config(CONFIG)
+        save_session_config(CONFIG)
         st.rerun()
