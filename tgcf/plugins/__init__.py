@@ -153,17 +153,17 @@ async def apply_plugins(message: Message, plugin_config: PluginConfig) -> TgcfMe
                 new_tm = await plugin.modify(tm)
             else:
                 new_tm = plugin.modify(tm)
-
-            # plugin filters the message
-            if new_tm is None:
-                logging.info(f"Message filtered by plugin {_id}")
-                tm.clear()
-                return None
-
-            tm = new_tm
-            logging.info(f"Applied plugin {_id}")
-
         except Exception as err:
             logging.error(f"Plugin {_id} failed: {err}. Skipping this plugin.")
+            continue
+
+        # plugin filters the message
+        if new_tm is None:
+            logging.info(f"Message filtered by plugin {_id}")
+            tm.clear()
+            return None
+
+        tm = new_tm
+        logging.info(f"Applied plugin {_id}")
 
     return tm
