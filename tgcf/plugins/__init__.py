@@ -150,18 +150,20 @@ async def apply_plugins(message: Message, plugin_config: PluginConfig) -> TgcfMe
     for _id, plugin in plugins.items():
         try:
             if inspect.iscoroutinefunction(plugin.modify):
-                tm = await plugin.modify(tm)
+                new_tm = await plugin.modify(tm)
             else:
-                tm = plugin.modify(tm)
+                new_tm = plugin.modify(tm)
+
+            # plugin filters the message
+            if new_tm is None:
+                logging.info(f"Message filtered by plugin {_id}")
+                tm.clear()
+                return None
+
+            tm = new_tm
+            logging.info(f"Applied plugin {_id}")
+
         except Exception as err:
-            logging.error(f"Plugin {_id} failed: {err}. Dropping message for safety.")
-            tm.clear()
-            return None
-
-        if tm is None:
-            logging.info(f"Message filtered by plugin {_id}")
-            return None
-
-        logging.info(f"Applied plugin {_id}")
+            logging.error(f"Plugin {_id} failed: {err}. Skipping this plugin.")
 
     return tm
