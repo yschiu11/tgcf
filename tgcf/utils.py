@@ -23,7 +23,7 @@ ALBUM_SEARCH_RADIUS = 10
 if TYPE_CHECKING:
     from tgcf.plugins import TgcfMessage
 
-from tgcf import storage as st
+
 
 class AlbumBuffer:
     """Manages buffering and detection of media albums (grouped messages)."""
@@ -200,8 +200,7 @@ def get_reply_to_mapping(
     if not config.reply_chain:
         return {}
     
-    reply_event = st.DummyEvent(source_chat_id, reply_to_msg_id)
-    reply_event_uid = st.EventUid(reply_event)
+    reply_event_uid = (source_chat_id, reply_to_msg_id)
     
     if reply_event_uid in stored:
         return stored[reply_event_uid]
@@ -270,7 +269,7 @@ async def forward_album_anonymous(
                 logging.error(f"Album size mismatch: expected {len(messages)}, got {len(sent_messages)}")
             # Update storage for each sent message
             for tm, sent_msg in zip(messages, sent_messages):
-                event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))
+                event_uid = (source_chat_id, tm.message.id)
                 if event_uid not in stored:
                     stored[event_uid] = {}
                 stored[event_uid][dest] = sent_msg.id
@@ -318,7 +317,7 @@ async def forward_album(
                 logging.error(f"Album size mismatch: expected {len(messages)}, got {len(forwarded)}")
             # Update storage for each message in the album
             for tm, fwd_msg in zip(messages, forwarded):
-                event_uid = st.EventUid(st.DummyEvent(source_chat_id, tm.message.id))
+                event_uid = (source_chat_id, tm.message.id)
                 if event_uid not in stored:
                     stored[event_uid] = {}
                 stored[event_uid][dest] = fwd_msg.id
@@ -345,7 +344,7 @@ async def forward_single_message(
         config: Config object for show_forwarded_from and reply_chain settings
         stored: Storage dict for message ID mapping
     """
-    event_uid = st.EventUid(st.DummyEvent(tm.message.chat_id, tm.message.id))
+    event_uid = (tm.message.chat_id, tm.message.id)
     if event_uid not in stored:
         stored[event_uid] = {}
 
