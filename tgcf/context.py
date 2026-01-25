@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 
 from telethon import TelegramClient
 from tgcf.config import Config, write_config
-from tgcf.storage import EventUid
+
 from tgcf.utils import AlbumBuffer
 
 
@@ -23,7 +23,7 @@ class TgcfContext:
     admins: list[int] = field(default_factory=list)
 
     # Message tracking, edit, delete, reply sync
-    stored: dict[EventUid, dict[int, int]] = field(default_factory=dict)
+    stored: dict[tuple[int, int], dict[int, int]] = field(default_factory=dict)
 
     # Album buffering
     album_buffers: dict[int, AlbumBuffer] = field(default_factory=dict)

@@ -10,7 +10,6 @@ from tgcf import const
 from tgcf.bot import get_events
 from tgcf.context import TgcfContext
 from tgcf.plugins import apply_plugins
-from tgcf.storage import EventUid
 from tgcf.utils import (
     send_message,
     send_album,
@@ -74,7 +73,7 @@ def make_new_message_handler(ctx: TgcfContext):
         logging.info(f"New message received in {chat_id}")
         message = event.message
 
-        event_uid = EventUid(event)
+        event_uid = (chat_id, event.id)
 
         # Prune old stored entries
         ctx.prune_stored(const.KEEP_LAST_MANY)
@@ -129,7 +128,7 @@ def make_edited_message_handler(ctx: TgcfContext):
 
         logging.info(f"Message edited in {chat_id}")
 
-        event_uid = EventUid(event)
+        event_uid = (chat_id, event.id)
 
         tm = await apply_plugins(message, ctx.config.plugins)
 
@@ -167,7 +166,8 @@ def make_deleted_message_handler(ctx: TgcfContext):
 
         logging.info(f"Message deleted in {chat_id}")
 
-        event_uid = EventUid(event)
+        msg_id = getattr(event, "id", None) or getattr(event, "deleted_id", None)
+        event_uid = (chat_id, msg_id)
         fwded_msgs = ctx.stored.get(event_uid)
         if fwded_msgs:
             for _, msg in fwded_msgs.items():
