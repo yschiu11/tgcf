@@ -166,13 +166,21 @@ def make_deleted_message_handler(ctx: TgcfContext):
 
         logging.info(f"Message deleted in {chat_id}")
 
-        msg_id = getattr(event, "id", None) or getattr(event, "deleted_id", None)
-        event_uid = (chat_id, msg_id)
-        fwded_msgs = ctx.stored.get(event_uid)
-        if fwded_msgs:
-            for _, msg in fwded_msgs.items():
-                await msg.delete()
+        # Telethon's MessageDeleted can have .deleted_ids (list) or .deleted_id (int)
+        ids = getattr(event, "deleted_ids", None) or [getattr(event, "deleted_id", None)]
+        
+        # Filter for valid integers only
+        ids = [i for i in ids if isinstance(i, int)]
+
+        if not ids:
             return
+
+        for msg_id in ids:
+            event_uid = (chat_id, msg_id)
+            fwded_msgs = ctx.stored.get(event_uid)
+            if fwded_msgs:
+                for _, msg in fwded_msgs.items():
+                    await msg.delete()
 
     return handler
 
