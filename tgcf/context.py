@@ -34,10 +34,8 @@ class TgcfContext:
         Remove old entries from stored, keeping only the last `keep_last` entries.
         """
 
-        excess = len(self.stored) - keep_last
-        if excess > 0:
-            for key in list(self.stored.keys())[:excess]:
-                del self.stored[key]
+        while len(self.stored) > keep_last:
+            self.stored.pop(next(iter(self.stored)))
 
     def save_config(self) -> None:
         """Save the config to the config file."""
