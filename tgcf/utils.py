@@ -60,6 +60,18 @@ class AlbumBuffer:
         """Check if buffer is empty."""
         return len(self.messages) == 0
 
+    def flush(self) -> list["TgcfMessage"]:
+        """
+        Retrieve messages and reset the buffer.
+        Return the list of messages that were in the buffer.
+        """
+        if not self.messages:
+            return []
+
+        messages, self.messages = self.messages, []
+        self.current_group_id = None
+        return messages
+
     def clear(self) -> None:
         """Clear all buffered messages and group ID."""
         for tm in self.messages:
@@ -112,7 +124,7 @@ async def send_message(
 
 async def send_album(
     client: TelegramClient,
-    album: AlbumBuffer,
+    messages: list["TgcfMessage"],
     destinations: list[int],
     config: Config,
     stored: dict,
@@ -121,15 +133,15 @@ async def send_album(
     
     Args:
         client: Telegram client
-        album: AlbumBuffer with messages
+        messages: List of TgcfMessage objects
         destinations: List of destination chat IDs
         config: Config object for show_forwarded_from setting
         stored: Storage dict for message ID mapping
     """
     if config.show_forwarded_from:
-        await forward_album(client, album, destinations, stored)
+        await forward_album(client, messages, destinations, stored)
     else:
-        await forward_album_anonymous(client, album, destinations, config, stored)
+        await forward_album_anonymous(client, messages, destinations, config, stored)
 
 
 def cleanup(*files: str) -> None:
@@ -210,7 +222,7 @@ def get_reply_to_mapping(
 
 async def forward_album_anonymous(
     client: TelegramClient,
-    album: AlbumBuffer,
+    messages: list["TgcfMessage"],
     destinations: list[int],
     config: Config,
     stored: dict,
@@ -219,12 +231,11 @@ async def forward_album_anonymous(
 
     Args:
         client: Telegram client
-        album: AlbumBuffer with messages
+        messages: List of TgcfMessage objects
         destinations: List of destination chat IDs
         config: Config object for reply_chain setting
         stored: Storage dict for message ID mapping
     """
-    messages = album.get_messages()
     if not messages:
         return
 
@@ -281,7 +292,7 @@ async def forward_album_anonymous(
 
 async def forward_album(
     client: TelegramClient,
-    album: AlbumBuffer,
+    messages: list["TgcfMessage"],
     destinations: list[int],
     stored: dict,
 ) -> None:
@@ -291,11 +302,10 @@ async def forward_album(
     
     Args:
         client: Telegram client
-        album: AlbumBuffer with messages
+        messages: List of TgcfMessage objects
         destinations: List of destination chat IDs
         stored: Storage dict for message ID mapping
     """
-    messages = album.get_messages()
     if not messages:
         return
 
@@ -470,21 +480,22 @@ async def send_single_message_with_fallback(
 
 async def send_album_with_fallback(
     client: TelegramClient,
-    album_buffer: AlbumBuffer,
+    messages: list["TgcfMessage"],
     dest_ids: list[int],
+    config: Config,
+    stored: Storage
 ) -> None:
     """Send an album to destinations, with fallback for protected content.
 
     First tries forward_album_anonymous. If that fails due to protected content restrictions,
     downloads all media and re-uploads as new content.
     """
-    messages = album_buffer.get_messages()
     if not messages:
         return
 
     # Try forward_album_anonymous first (faster for non-protected channels)
     try:
-        await forward_album_anonymous(client, album_buffer, dest_ids)
+        await forward_album_anonymous(client, messages, dest_ids, config, stored)
         logging.info(f"Sent album to destinations (direct)")
         return
     except Exception as err:
@@ -579,6 +590,8 @@ async def forward_by_link(
 
     dest_ids = await resolve_dest_ids(client, destinations)
 
+    stored = {}
+
     # Fetch the target message
     message = await client.get_messages(channel, ids=msg_id)
     if not message:
@@ -591,7 +604,8 @@ async def forward_by_link(
             client, channel, msg_id, message.grouped_id
         )
 
-        await send_album_with_fallback(client, album_buffer, dest_ids)
+        messages = album_buffer.flush()
+        await send_album_with_fallback(client, messages, dest_ids, config, stored)
     else:
         for dest in dest_ids:
             try:
