@@ -35,18 +35,19 @@ async def process_buffered_messages(
         album_buffer: Buffer containing messages to forward
         destinations: List of destination chat IDs
     """
-    if album_buffer.is_empty():
+    messages = album_buffer.flush()
+    if not messages:
         return
 
-    if album_buffer.is_album():
-        # Multiple messages = true album, forward as batch
-        await send_album(ctx.client, album_buffer, destinations, ctx.config, ctx.stored)
-    else:
-        # Single message from buffer, forward individually
-        tm = album_buffer.get_messages()[0]
-        await forward_single_message(tm, destinations, ctx.config, ctx.stored)
-
-    album_buffer.clear()
+    try:
+        if len(messages) > 1:
+            await send_album(ctx.client, messages, destinations, ctx.config, ctx.stored)
+        else:
+            tm = messages[0]
+            await forward_single_message(tm, destinations, ctx.config, ctx.stored)
+    finally:
+        for tm in messages:
+            tm.clear()
 
 
 async def forward_job(ctx: TgcfContext) -> None:

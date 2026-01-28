@@ -25,13 +25,21 @@ async def _flush_album(
 ) -> None:
     """Flush the buffered album for a specific chat after timeout."""
     buffer = ctx.album_buffers.get(chat_id)
-    if buffer and not buffer.is_empty():
-        if buffer.is_album():
-            await send_album(ctx.client, buffer, destinations, ctx.config, ctx.stored)
+    if not buffer:
+        return
+
+    messages = buffer.flush()
+    if not messages:
+        return
+    try:
+        if len(messages) > 1:
+            await send_album(ctx.client, messages, destinations, ctx.config, ctx.stored)
         else:
-            tm = buffer.get_messages()[0]
+            tm = messages[0]
             await forward_single_message(tm, destinations, ctx.config, ctx.stored)
-        buffer.clear()
+    finally:
+        for tm in messages:
+            tm.clear()
 
     # Clean up the flush task
     if chat_id in ctx.flush_tasks:
@@ -57,6 +65,7 @@ def _schedule_album_flush(
             await _flush_album(ctx, chat_id, destinations)
         except asyncio.CancelledError:
             logging.debug(f"Album flush task cancelled for chat {chat_id}")
+            raise
 
     ctx.flush_tasks[chat_id] = asyncio.create_task(_timeout_wrapper())
 
