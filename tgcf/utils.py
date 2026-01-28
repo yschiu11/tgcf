@@ -482,6 +482,8 @@ async def send_album_with_fallback(
     client: TelegramClient,
     messages: list["TgcfMessage"],
     dest_ids: list[int],
+    config: Config,
+    stored: Storage
 ) -> None:
     """Send an album to destinations, with fallback for protected content.
 
@@ -493,7 +495,7 @@ async def send_album_with_fallback(
 
     # Try forward_album_anonymous first (faster for non-protected channels)
     try:
-        await forward_album_anonymous(client, messages, dest_ids)
+        await forward_album_anonymous(client, messages, dest_ids, config, stored)
         logging.info(f"Sent album to destinations (direct)")
         return
     except Exception as err:
@@ -588,6 +590,8 @@ async def forward_by_link(
 
     dest_ids = await resolve_dest_ids(client, destinations)
 
+    stored = {}
+
     # Fetch the target message
     message = await client.get_messages(channel, ids=msg_id)
     if not message:
@@ -601,7 +605,7 @@ async def forward_by_link(
         )
 
         messages = album_buffer.flush()
-        await send_album_with_fallback(client, messages, dest_ids)
+        await send_album_with_fallback(client, messages, dest_ids, config, stored)
     else:
         for dest in dest_ids:
             try:
