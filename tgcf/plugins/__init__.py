@@ -39,10 +39,10 @@ class TgcfMessage:
     def guess_file_type(self) -> FileType:
         for i in FileType:
             if i == FileType.NOFILE:
+                continue
+            if getattr(self.message, i.value, None):
                 return i
-            obj = getattr(self.message, i.value)
-            if obj:
-                return i
+        return FileType.NOFILE
 
     def clear(self) -> None:
         if self.new_file and self.cleanup:
