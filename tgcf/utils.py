@@ -483,7 +483,7 @@ async def send_album_with_fallback(
     messages: list["TgcfMessage"],
     dest_ids: list[int],
     config: Config,
-    stored: Storage
+    stored: dict
 ) -> None:
     """Send an album to destinations, with fallback for protected content.
 
