@@ -167,24 +167,22 @@ async def get_id(client: TelegramClient, peer):
 
 async def load_from_to(
     client: TelegramClient, forwards: List[Forward]
-) -> Dict[int, List[int]]:
-    """Convert a list of Forward objects to a mapping.
+) -> Dict[int, tuple[Forward, list[int]]]:
+    """Convert Forward objects to a mapping with resolved IDs.
 
     Args:
         client: Instance of Telegram client (logged in)
         forwards: List of Forward objects
 
     Returns:
-        Dict: key = chat id of source
-                value = List of chat ids of destinations
+        Dict mapping source chat ID -> (original Forward, resolved dest IDs)
 
     Notes:
     -> The Forward objects may contain username/phn no/links
     -> But this mapping strictly contains signed integer chat ids
-    -> Chat ids are essential for how storage is implemented
-    -> Storage is essential for edit, delete and reply syncs
+    -> The Forward reference is preserved for offset tracking in past mode
     """
-    from_to_dict = {}
+    from_to_dict: Dict[int, tuple[Forward, list[int]]] = {}
 
     async def _(peer):
         return await get_id(client, peer)
@@ -196,8 +194,9 @@ async def load_from_to(
         if not isinstance(source, int) and source.strip() == "":
             continue
         src = await _(forward.source)
-        from_to_dict[src] = [await _(dest) for dest in forward.dest]
-    logging.info(f"From to dict is {from_to_dict}")
+        dests = [await _(dest) for dest in forward.dest]
+        from_to_dict[src] = (forward, dests)
+    logging.info(f"Loaded {len(from_to_dict)} active forwards")
     return from_to_dict
 
 

@@ -87,7 +87,7 @@ def make_new_message_handler(ctx: TgcfContext):
         # Prune old stored entries
         ctx.prune_stored(const.KEEP_LAST_MANY)
 
-        dest = ctx.from_to.get(chat_id)
+        _, dest = ctx.from_to[chat_id]
 
         tm = await apply_plugins(message, ctx.config.plugins)
         if not tm:
@@ -155,7 +155,7 @@ def make_edited_message_handler(ctx: TgcfContext):
                     await msg.edit(tm.text)
             return
 
-        dest = ctx.from_to.get(chat_id)
+        _, dest = ctx.from_to[chat_id]
 
         for d in dest:
             await send_message(d, tm, ctx.config)
