@@ -59,11 +59,10 @@ async def forward_job(ctx: TgcfContext) -> None:
     """
     config = ctx.config
 
-    for from_to, forward in zip(ctx.from_to.items(), config.forwards):
-        src, dest = from_to
+    for src, (forward, dests) in ctx.from_to.items():
         album_buffer = AlbumBuffer()
 
-        logging.info(f"Forwarding messages from {src} to {dest}")
+        logging.info(f"Forwarding messages from {src} to {dests}")
 
         try:
             async for message in ctx.client.iter_messages(
@@ -84,7 +83,7 @@ async def forward_job(ctx: TgcfContext) -> None:
 
                     # Check if we should flush the current album buffer
                     if album_buffer.should_flush(message.grouped_id):
-                        await process_buffered_messages(ctx, album_buffer, dest)
+                        await process_buffered_messages(ctx, album_buffer, dests)
 
                     # Process current message
                     if message.grouped_id:
@@ -92,7 +91,7 @@ async def forward_job(ctx: TgcfContext) -> None:
                         album_buffer.add_message(tm)
                     else:
                         # This is a standalone message, forward it immediately
-                        await forward_single_message(tm, dest, ctx.config, ctx.stored)
+                        await forward_single_message(tm, dests, ctx.config, ctx.stored)
                         tm.clear()
 
                     # Update tracking in memory; persisted in finally block
@@ -109,8 +108,8 @@ async def forward_job(ctx: TgcfContext) -> None:
                     logging.exception(err)
         finally:
             # Forward any remaining buffered album at the end
-            await process_buffered_messages(ctx, album_buffer, dest)
+            await process_buffered_messages(ctx, album_buffer, dests)
 
-            logging.info(f"Completed forwarding from {src} to {dest}")
+            logging.info(f"Completed forwarding from {src} to {dests}")
 
             ctx.save_config()

@@ -2,7 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 
 from telethon import TelegramClient
-from tgcf.config import Config, write_config
+from tgcf.config import Config, Forward, write_config
 
 from tgcf.utils import AlbumBuffer
 
@@ -19,7 +19,8 @@ class TgcfContext:
     is_bot: bool | None = None
 
     # Resolved mappings, compute once after client connects
-    from_to: dict[int, list[int]] = field(default_factory=dict)
+    # Map source chat ID -> (Forward object, resolved dest IDs)
+    from_to: dict[int, tuple[Forward, list[int]]] = field(default_factory=dict)
     admins: list[int] = field(default_factory=list)
 
     # Message tracking, edit, delete, reply sync
