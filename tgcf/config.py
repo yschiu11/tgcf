@@ -9,6 +9,7 @@ import tempfile
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
 from telethon.sessions import StringSession
+from telethon.utils import get_peer_id
 
 from tgcf.const import CONFIG_FILE_NAME
 from tgcf.plugin_models import PluginConfig
@@ -159,7 +160,7 @@ async def get_id(client: TelegramClient, peer):
             return int(peer)
         # get the entity first, then extract ID
         entity = await client.get_entity(peer)
-        return entity.id
+        return get_peer_id(entity)
     except Exception as err:
         logging.error(f"Failed to get ID for peer {peer}: {err}")
         raise
