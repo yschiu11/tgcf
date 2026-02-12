@@ -25,6 +25,8 @@ class TgcfContext:
 
     # Message tracking, edit, delete, reply sync
     stored: dict[tuple[int, int], dict[int, int]] = field(default_factory=dict)
+    history: MessageHistory = None
+    pipeline: 'ForwardingPipeline' = None
 
     # Album buffering
     album_buffers: dict[int, AlbumBuffer] = field(default_factory=dict)
@@ -37,6 +39,10 @@ class TgcfContext:
 
         while len(self.stored) > keep_last:
             self.stored.pop(next(iter(self.stored)))
+
+    def bind_client(self, client: TelegramClient):
+        self.client = client
+        self.pipeline = ForwardingPipeline(self.client, self.config, self.history)
 
     def save_config(self) -> None:
         """Save the config to the config file."""

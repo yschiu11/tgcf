@@ -99,17 +99,17 @@ async def _run(mode: Mode, config_path: str) -> None:
         async with TelegramClient(
             session, config.login.API_ID, config.login.API_HASH
         ) as client:
-            ctx.client = client
+            ctx.bind_client(client)
             ctx.from_to = await load_from_to(client, config.forwards)
             await forward_job(ctx)
     else:
         session = get_SESSION(config.login)
-        ctx.client = TelegramClient(
+        ctx.bind_client(TelegramClient(
             session,
             config.login.API_ID,
             config.login.API_HASH,
             sequential_updates=config.live.sequential_updates,
-        )
+        ))
 
         if config.login.user_type == 0:
             if config.login.BOT_TOKEN == "":
