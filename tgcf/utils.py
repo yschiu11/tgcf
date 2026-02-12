@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Optional
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
 from telethon.tl.custom.message import Message
+from telethon.utils import get_peer_id
 
 from tgcf import __version__
 from tgcf.config import Config
@@ -557,7 +558,7 @@ async def resolve_dest_ids(
                 dest_ids.append(int(dest))
             else:
                 entity = await client.get_entity(dest)
-                dest_ids.append(entity.id)
+                dest_ids.append(get_peer_id(entity))
         except Exception as err:
             logging.error(f"Failed to resolve destination {dest}: {err}")
             raise
