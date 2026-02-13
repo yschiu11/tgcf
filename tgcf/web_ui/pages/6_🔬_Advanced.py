@@ -2,7 +2,7 @@ import json
 
 import streamlit as st
 
-from tgcf.utils import platform_info
+from tgcf.utils.io import platform_info
 from tgcf.web_ui.password import check_password
 from tgcf.web_ui.utils import (
     hide_st,

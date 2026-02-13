@@ -14,7 +14,7 @@ from telethon.tl.custom.message import Message
 
 from tgcf.config import Config
 from tgcf.plugin_models import FileType, ASYNC_PLUGIN_IDS, PluginConfig
-from tgcf.utils import cleanup, stamp
+from tgcf.utils.io import cleanup, stamp
 
 
 class TgcfMessage:

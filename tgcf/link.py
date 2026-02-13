@@ -9,7 +9,7 @@ import logging
 from telethon import TelegramClient
 
 from tgcf.config import read_config, ensure_config_exists, get_SESSION
-from tgcf.utils import forward_by_link
+from tgcf.utils.sender import forward_by_link
 
 
 async def forward_link_job(url: str, destinations: list[str]) -> None:
