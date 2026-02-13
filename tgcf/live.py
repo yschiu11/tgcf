@@ -9,48 +9,10 @@ from telethon.tl.custom.message import Message
 from tgcf import const
 from tgcf.bot import get_events
 from tgcf.context import TgcfContext
-from tgcf.plugins import apply_plugins
-from tgcf.utils import (
-    send_message,
-    send_album,
-    AlbumBuffer,
-    forward_single_message,
-)
+from tgcf.pipeline import MessagePacket, PipelineStatus
 
 
-async def _flush_album(
-    ctx: TgcfContext,
-    chat_id: int,
-    destinations: list[int],
-) -> None:
-    """Flush the buffered album for a specific chat after timeout."""
-    buffer = ctx.album_buffers.get(chat_id)
-    if not buffer:
-        return
-
-    messages = buffer.flush()
-    if not messages:
-        return
-    try:
-        if len(messages) > 1:
-            await send_album(ctx.client, messages, destinations, ctx.config, ctx.stored)
-        else:
-            tm = messages[0]
-            await forward_single_message(tm, destinations, ctx.config, ctx.stored)
-    finally:
-        for tm in messages:
-            tm.clear()
-
-    # Clean up the flush task
-    if chat_id in ctx.flush_tasks:
-        del ctx.flush_tasks[chat_id]
-
-
-def _schedule_album_flush(
-    ctx: TgcfContext,
-    chat_id: int,
-    destinations: list[int],
-) -> None:
+async def _schedule_album_flush(ctx: TgcfContext, chat_id: int) -> None:
     """Schedule or reschedule the album flush timeout for a chat."""
     timeout = ctx.config.live.album_flush_timeout
 
@@ -62,17 +24,20 @@ def _schedule_album_flush(
     async def _timeout_wrapper():
         try:
             await asyncio.sleep(timeout)
-            await _flush_album(ctx, chat_id, destinations)
+            await ctx.pipeline.flush(chat_id)
         except asyncio.CancelledError:
-            logging.debug(f"Album flush task cancelled for chat {chat_id}")
+            logging.debug(f"Flush cancelled for chat {chat_id}")
             raise
+        finally:
+            if ctx.flush_tasks.get(chat_id) == asyncio.current_task():
+                del ctx.flush_tasks[chat_id]
 
     ctx.flush_tasks[chat_id] = asyncio.create_task(_timeout_wrapper())
 
 
 def make_new_message_handler(ctx: TgcfContext):
     """Factory that creates a new message handler with context closure."""
-    
+
     async def handler(event: Message | events.NewMessage) -> None:
         """Process new incoming messages with album buffering support."""
         chat_id = event.chat_id
@@ -80,46 +45,23 @@ def make_new_message_handler(ctx: TgcfContext):
         if chat_id not in ctx.from_to:
             return
         logging.info(f"New message received in {chat_id}")
-        message = event.message
-
-        event_uid = (chat_id, event.id)
-
-        # Prune old stored entries
-        ctx.prune_stored(const.KEEP_LAST_MANY)
 
         _, dest = ctx.from_to[chat_id]
 
-        tm = await apply_plugins(message, ctx.config.plugins)
-        if not tm:
-            return
+        packet = MessagePacket(
+            raw_message=event.message,
+            source_chat_id=chat_id,
+            dest_chat_ids=dest
+        )
 
-        # Initialize buffer for this chat if needed
-        if chat_id not in ctx.album_buffers:
-            ctx.album_buffers[chat_id] = AlbumBuffer()
+        result = await ctx.pipeline.handle_message(packet)
 
-        buffer = ctx.album_buffers[chat_id]
+        if result.did_flush and chat_id in ctx.flush_tasks:
+            ctx.flush_tasks[chat_id].cancel()
+            del ctx.flush_tasks[chat_id]
 
-        # Check if we need to flush the current buffer due to group ID change
-        if buffer.should_flush(message.grouped_id):
-            # Cancel pending flush task to prevent duplicate flush
-            if chat_id in ctx.flush_tasks:
-                ctx.flush_tasks[chat_id].cancel()
-            # Flush existing album before processing new message
-            await _flush_album(ctx, chat_id, dest)
-
-        # Add message to buffer
-        if message.grouped_id:
-            # This message is part of an album, buffer it
-            # Pre-create storage entry so edit/delete handlers can find it
-            ctx.stored[event_uid] = {}
-            buffer.add_message(tm)
-            # Schedule flush after timeout in case no more messages arrive
-            _schedule_album_flush(ctx, chat_id, dest)
-        else:
-            # Standalone message, forward immediately
-            ctx.stored[event_uid] = {}
-            await forward_single_message(tm, dest, ctx.config, ctx.stored)
-            tm.clear()
+        if result.status == PipelineStatus.BUFFERED:
+            await _schedule_album_flush(ctx, chat_id)
 
     return handler
 
@@ -129,37 +71,21 @@ def make_edited_message_handler(ctx: TgcfContext):
 
     async def handler(event) -> None:
         """Handle message edits."""
-        message = event.message
         chat_id = event.chat_id
 
         if chat_id not in ctx.from_to:
             return
 
         logging.info(f"Message edited in {chat_id}")
-
-        event_uid = (chat_id, event.id)
-
-        tm = await apply_plugins(message, ctx.config.plugins)
-
-        if not tm:
-            return
-
-        fwded_msgs = ctx.stored.get(event_uid)
-
-        if fwded_msgs:
-            for _, msg in fwded_msgs.items():
-                if ctx.config.live.delete_on_edit == message.text:
-                    await msg.delete()
-                    await message.delete()
-                else:
-                    await msg.edit(tm.text)
-            return
-
         _, dest = ctx.from_to[chat_id]
 
-        for d in dest:
-            await send_message(d, tm, ctx.config)
-        tm.clear()
+        packet = MessagePacket(
+            raw_message=event.message,
+            source_chat_id=chat_id,
+            dest_chat_ids=dest
+        )
+
+        await ctx.pipeline.handle_edit(packet)
 
     return handler
 
@@ -177,19 +103,14 @@ def make_deleted_message_handler(ctx: TgcfContext):
 
         # Telethon's MessageDeleted can have .deleted_ids (list) or .deleted_id (int)
         ids = getattr(event, "deleted_ids", None) or [getattr(event, "deleted_id", None)]
-        
+
         # Filter for valid integers only
         ids = [i for i in ids if isinstance(i, int)]
 
         if not ids:
             return
 
-        for msg_id in ids:
-            event_uid = (chat_id, msg_id)
-            fwded_msgs = ctx.stored.get(event_uid)
-            if fwded_msgs:
-                for _, msg in fwded_msgs.items():
-                    await msg.delete()
+        await ctx.pipeline.handle_delete(chat_id, ids)
 
     return handler
 
@@ -205,7 +126,7 @@ def get_core_events(ctx: TgcfContext) -> dict:
 
 async def start_sync(ctx: TgcfContext) -> None:
     """Start tgcf live sync.
-    
+
     Args:
         ctx: Fully-initialized TgcfContext with client, from_to, and admins
     """
