@@ -26,7 +26,7 @@ class TgcfMessage:
         self.file_type = self.guess_file_type()
         self.new_file = None
         self.cleanup = False
-        self.reply_to = None
+        self.reply_to: int | None = None
         self.client = self.message.client
 
     async def get_file(self) -> str:

@@ -16,6 +16,9 @@ from tgcf.utils.text import parse_telegram_link
 if TYPE_CHECKING:
     from tgcf.plugins import TgcfMessage
 
+# Maps (source_chat_id, source_msg_id) -> {dest_chat_id: dest_msg_id}
+ForwardMap = dict[tuple[int, int], dict[int, int | None]]
+
 
 async def send_message(
     recipient: EntityLike,
@@ -55,7 +58,7 @@ async def send_album(
     messages: list["TgcfMessage"],
     destinations: list[int],
     config: Config,
-    stored: dict,
+    stored: ForwardMap,
 ) -> None:
     """Forward or send an album, depending on config.
 
@@ -76,8 +79,8 @@ def get_reply_to_mapping(
     source_chat_id: int,
     reply_to_msg_id: int,
     config: Config,
-    stored: dict,
-) -> dict[int, int]:
+    stored: ForwardMap,
+) -> dict[int, int | None]:
     """Get reply_to message IDs for each destination if reply chain is enabled.
 
     Args:
@@ -106,7 +109,7 @@ async def forward_album_anonymous(
     messages: list["TgcfMessage"],
     destinations: list[int],
     config: Config,
-    stored: dict,
+    stored: ForwardMap,
 ) -> None:
     """Send album as new messages without 'Forwarded from' attribution.
 
@@ -139,7 +142,7 @@ async def forward_album_anonymous(
         return
 
     # Check if the first message in album is a reply
-    reply_to_mapping: dict[int, int] = {}
+    reply_to_mapping: dict[int, int | None] = {}
     if first_message.is_reply:
         reply_to_mapping = get_reply_to_mapping(
             source_chat_id, first_message.reply_to_msg_id, config, stored
@@ -180,7 +183,7 @@ async def forward_album(
     client: TelegramClient,
     messages: list["TgcfMessage"],
     destinations: list[int],
-    stored: dict,
+    stored: ForwardMap,
 ) -> None:
     """Forward an entire album to destinations.
 
@@ -233,7 +236,7 @@ async def forward_single_message(
     tm: "TgcfMessage",
     destinations: list[int],
     config: Config,
-    stored: dict,
+    stored: ForwardMap,
 ) -> None:
     """Forward a single message to destinations.
 
@@ -249,7 +252,7 @@ async def forward_single_message(
     if event_uid not in stored:
         stored[event_uid] = {}
 
-    reply_to_mapping: dict[int, int] = {}
+    reply_to_mapping: dict[int, int | None] = {}
     if tm.message.is_reply:
         reply_to_mapping = get_reply_to_mapping(
             tm.message.chat_id, tm.message.reply_to_msg_id, config, stored
@@ -257,7 +260,7 @@ async def forward_single_message(
 
     for dest in destinations:
         try:
-            tm.reply_to = reply_to_mapping.get(dest, None)
+            tm.reply_to = reply_to_mapping.get(dest)
             fwded_msg = await send_message(dest, tm, config)
             stored[event_uid][dest] = fwded_msg.id
         except Exception as err:
@@ -318,7 +321,7 @@ async def send_album_with_fallback(
     messages: list["TgcfMessage"],
     dest_ids: list[int],
     config: Config,
-    stored: dict,
+    stored: ForwardMap,
 ) -> None:
     """Send an album to destinations, with fallback for protected content.
 
@@ -428,7 +431,7 @@ async def forward_by_link(
 
     dest_ids = await resolve_dest_ids(client, destinations)
 
-    stored: dict = {}
+    stored: ForwardMap = {}
 
     # Fetch the target message
     message = await client.get_messages(channel, ids=msg_id)

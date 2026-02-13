@@ -38,6 +38,7 @@ def stamp(file: str, user: str) -> str:
         return outf
     except Exception as err:
         logging.warning(f"Stamping file name failed for {file} to {outf}. \n {err}")
+        return file
 
 
 def safe_name(string: str) -> str:
