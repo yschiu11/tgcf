@@ -37,7 +37,7 @@ async def forward_job(ctx: TgcfContext) -> None:
                 packet = MessagePacket(message, src, dests)
 
                 try:
-                    result = await pipeline.handle_message(packet)
+                    await pipeline.handle_message(packet)
 
                     if pipeline.is_safe_to_checkpoint(src):
                         forward.offset = message.id

@@ -15,7 +15,7 @@ import logging
 
 class MessageHistory:
     def __init__(self):
-        self.records: dict[tuple[int, int], dict[int, int]] = {}
+        self.records: dict[tuple[int, int], dict[int, int | None]] = {}
 
     def add_placeholder(self, source_chat: int, source_msg: int, dest_chats: list[int]):
         uid = (source_chat, source_msg)
@@ -51,6 +51,7 @@ class PipelineStatus(Enum):
     BUFFERED = auto()
     FLUSHED = auto()
     IGNORED = auto()
+    DELETED = auto()
 
 @dataclass
 class PipelineResult:
@@ -154,6 +155,7 @@ class ForwardingPipeline:
                     if msg.media:
                         logging.warning("Media edits are not supported by Telegram API, only text/caption edits are synced")
                     await self.client.edit_message(dest_id, dest_msg_id, text=tm.text)
+            tm.clear()
             return PipelineResult(PipelineStatus.SENT)
 
         await forward_single_message(tm, packet.dest_chat_ids, self.config, self.history.records)
@@ -172,4 +174,4 @@ class ForwardingPipeline:
                         await self.client.delete_messages(dest_id, dest_msg_id)
                     except Exception as e:
                         logging.error(f"Failed to delete message {dest_msg_id} in {dest_id}: {e}")
-        return PipelineResult(PipelineStatus.FLUSHED)
+        return PipelineResult(PipelineStatus.DELETED)
