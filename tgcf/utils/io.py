@@ -21,7 +21,11 @@ def platform_info() -> str:
 
 
 def cleanup(*files: str) -> None:
-    """Delete the file names passed as args."""
+    """Delete files by path, logging if any do not exist.
+
+    Args:
+        *files: Paths to delete.
+    """
     for file in files:
         try:
             os.remove(file)
@@ -30,7 +34,15 @@ def cleanup(*files: str) -> None:
 
 
 def stamp(file: str, user: str) -> str:
-    """Stamp the filename with the datetime, and user info."""
+    """Rename a file by prepending user info and a timestamp.
+
+    Args:
+        file: Original file path.
+        user: Identifier to include in the new name.
+
+    Returns:
+        The new file path, or the original path if renaming fails.
+    """
     now = str(datetime.now())
     outf = safe_name(f"{user} {now} {file}")
     try:
@@ -42,8 +54,9 @@ def stamp(file: str, user: str) -> str:
 
 
 def safe_name(string: str) -> str:
-    """Return safe file name.
+    """Replace special characters with underscores to produce a safe filename.
 
-    Certain characters in the file name can cause potential problems in rare scenarios.
+    Args:
+        string: Raw filename string.
     """
     return re.sub(pattern=r"[-!@#$%^&*()\s]", repl="_", string=string)

@@ -6,12 +6,15 @@ from tgcf.plugin_models import STYLE_CODES
 
 
 def match(pattern: str, string: str, regex: bool) -> bool:
-    """Check if pattern matches string.
+    """Check if pattern exists in string.
 
     Args:
-        pattern: The pattern to search for.
-        string: The string to search in.
-        regex: If True, treat pattern as a regex.
+        pattern: Literal substring or regex pattern.
+        string: Text to search in.
+        regex: If True, interpret pattern as a regular expression.
+
+    Returns:
+        True if the pattern is found.
     """
     if regex:
         return bool(re.findall(pattern, string))
@@ -19,13 +22,19 @@ def match(pattern: str, string: str, regex: bool) -> bool:
 
 
 def replace(pattern: str, new: str, string: str, regex: bool) -> str:
-    """Replace pattern in string, with optional regex and style support.
+    """Replace occurrences of pattern in string.
+
+    When ``regex`` is True and ``new`` is a key in ``STYLE_CODES``,
+    the matched text is wrapped with the corresponding markup.
 
     Args:
-        pattern: The pattern to find.
-        new: The replacement string (or a style code key).
-        string: The source string.
-        regex: If True, treat pattern as a regex.
+        pattern: Literal substring or regex pattern.
+        new: Replacement string, or a STYLE_CODES key for wrapping.
+        string: Source text.
+        regex: If True, interpret pattern as a regular expression.
+
+    Returns:
+        The string with replacements applied.
     """
 
     def fmt_repl(matched: re.Match[str]) -> str:

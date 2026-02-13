@@ -25,12 +25,18 @@ async def send_message(
     tm: "TgcfMessage",
     config: Config,
 ) -> Message:
-    """Forward or send a copy, depending on config.
+    """Send a message to a recipient, forwarding or copying per config.
+
+    If ``config.show_forwarded_from`` is set, attempts a native forward
+    first and falls back to an anonymous copy on failure.
 
     Args:
         recipient: Destination chat.
-        tm: TgcfMessage to send.
-        config: Config object for show_forwarded_from setting.
+        tm: Wrapped message to send.
+        config: Global forwarding configuration.
+
+    Returns:
+        The sent or forwarded ``Message`` object.
     """
     client: TelegramClient = tm.client
     if config.show_forwarded_from:
@@ -60,14 +66,14 @@ async def send_album(
     config: Config,
     stored: ForwardMap,
 ) -> None:
-    """Forward or send an album, depending on config.
+    """Dispatch an album to destinations via forward or anonymous copy.
 
     Args:
         client: Telegram client.
-        messages: List of TgcfMessage objects.
-        destinations: List of destination chat IDs.
-        config: Config object for show_forwarded_from setting.
-        stored: Storage dict for message ID mapping.
+        messages: Album messages.
+        destinations: Destination chat IDs.
+        config: Global forwarding configuration.
+        stored: Forward map updated with sent message IDs.
     """
     if config.show_forwarded_from:
         await forward_album(client, messages, destinations, stored)
@@ -81,17 +87,20 @@ def get_reply_to_mapping(
     config: Config,
     stored: ForwardMap,
 ) -> dict[int, int | None]:
-    """Get reply_to message IDs for each destination if reply chain is enabled.
+    """Look up forwarded reply-to IDs for each destination.
+
+    When reply chaining is enabled, maps each destination to the
+    message ID that the reply should point to.
 
     Args:
-        source_chat_id: The chat ID where the original message came from.
-        reply_to_msg_id: The message ID that the original message is replying to.
-        config: Config object for reply_chain setting.
-        stored: Storage dict for message ID mapping.
+        source_chat_id: Chat where the original message lives.
+        reply_to_msg_id: ID the original message replies to.
+        config: Global configuration (checked for ``reply_chain``).
+        stored: Forward map with previously sent IDs.
 
     Returns:
-        Dict mapping destination chat IDs to their corresponding
-        reply_to message IDs.
+        Mapping of destination chat ID to reply-to message ID,
+        or empty dict if reply chaining is disabled or no match.
     """
     if not config.reply_chain:
         return {}
@@ -111,14 +120,17 @@ async def forward_album_anonymous(
     config: Config,
     stored: ForwardMap,
 ) -> None:
-    """Send album as new messages without 'Forwarded from' attribution.
+    """Re-upload album media as new messages (no 'Forwarded from' tag).
 
     Args:
         client: Telegram client.
-        messages: List of TgcfMessage objects.
-        destinations: List of destination chat IDs.
-        config: Config object for reply_chain setting.
-        stored: Storage dict for message ID mapping.
+        messages: Album messages.
+        destinations: Destination chat IDs.
+        config: Global configuration (used for reply chaining).
+        stored: Forward map updated with sent message IDs.
+
+    Raises:
+        Exception: Propagated from the Telegram API on send failure.
     """
     if not messages:
         return
@@ -185,16 +197,13 @@ async def forward_album(
     destinations: list[int],
     stored: ForwardMap,
 ) -> None:
-    """Forward an entire album to destinations.
-
-    Uses native Telegram forward to preserve album structure with
-    'Forwarded from' tag.
+    """Forward an album using native Telegram forward (preserves attribution).
 
     Args:
         client: Telegram client.
-        messages: List of TgcfMessage objects.
-        destinations: List of destination chat IDs.
-        stored: Storage dict for message ID mapping.
+        messages: Album messages.
+        destinations: Destination chat IDs.
+        stored: Forward map updated with forwarded message IDs.
     """
     if not messages:
         return
@@ -238,15 +247,16 @@ async def forward_single_message(
     config: Config,
     stored: ForwardMap,
 ) -> None:
-    """Forward a single message to destinations.
+    """Forward a single message to all destinations.
 
-    Uses send_message utility which respects plugin modifications.
+    Respects plugin modifications applied to ``tm`` and maintains
+    reply chain mapping in ``stored``.
 
     Args:
-        tm: TgcfMessage to forward.
-        destinations: List of destination chat IDs.
-        config: Config object for show_forwarded_from and reply_chain settings.
-        stored: Storage dict for message ID mapping.
+        tm: Wrapped message (may have been modified by plugins).
+        destinations: Destination chat IDs.
+        config: Global forwarding configuration.
+        stored: Forward map updated with sent message IDs.
     """
     event_uid = (tm.message.chat_id, tm.message.id)
     if event_uid not in stored:
@@ -275,11 +285,16 @@ async def send_single_message_with_fallback(
     dest: int,
     config: Config,
 ) -> None:
-    """Send a single message to destination, with fallback for protected content.
+    """Send a message with download+reupload fallback for protected content.
 
-    First tries send_message (via TgcfMessage wrapper). If that fails due to
-    protected content restrictions, downloads the media and re-uploads as new
-    content.
+    Args:
+        client: Telegram client.
+        message: Raw Telegram message.
+        dest: Destination chat ID.
+        config: Global forwarding configuration.
+
+    Raises:
+        ValueError: If the message is text-only (no media to reupload).
     """
     from tgcf.plugins import TgcfMessage
 
@@ -323,10 +338,14 @@ async def send_album_with_fallback(
     config: Config,
     stored: ForwardMap,
 ) -> None:
-    """Send an album to destinations, with fallback for protected content.
+    """Send an album with download+reupload fallback for protected content.
 
-    First tries forward_album_anonymous. If that fails due to protected content
-    restrictions, downloads all media and re-uploads as new content.
+    Args:
+        client: Telegram client.
+        messages: Album messages.
+        dest_ids: Destination chat IDs.
+        config: Global forwarding configuration.
+        stored: Forward map updated with sent message IDs.
     """
     if not messages:
         return
@@ -413,14 +432,17 @@ async def forward_by_link(
 ) -> None:
     """Forward a message or album by its Telegram post link.
 
-    Always sends as a clean copy without 'Forwarded from' attribution.
-    Uses fallback download+reupload for protected channels.
+    Sends as a clean copy (no attribution). Falls back to
+    download+reupload for channels with content protection.
 
     Args:
-        client: Authenticated TelegramClient.
-        url: Telegram post link.
-        destinations: List of destination chat IDs or usernames.
-        config: Config.
+        client: Authenticated Telegram client.
+        url: Telegram post link (``t.me/...``).
+        destinations: Destination chat IDs or usernames.
+        config: Global forwarding configuration.
+
+    Raises:
+        ValueError: If the link is invalid or the message is not found.
     """
     parsed = parse_telegram_link(url)
     if not parsed:

@@ -26,11 +26,14 @@ class AlbumBuffer:
         self.current_group_id = tm.message.grouped_id
 
     def should_flush(self, next_grouped_id: int | None) -> bool:
-        """Determine if the current album should be forwarded.
+        """Check whether the buffer should be flushed before the next message.
 
-        Returns True when:
-        - Buffer has messages AND
-        - Next message has different grouped_id or no grouped_id
+        Args:
+            next_grouped_id: The grouped_id of the incoming message.
+
+        Returns:
+            True if the buffer has messages and the next message
+            belongs to a different album.
         """
         if not self.messages:
             return False
@@ -49,11 +52,7 @@ class AlbumBuffer:
         return len(self.messages) == 0
 
     def flush(self) -> list["TgcfMessage"]:
-        """Retrieve messages and reset the buffer.
-
-        Returns:
-            The list of messages that were in the buffer.
-        """
+        """Return all buffered messages and reset the buffer."""
         if not self.messages:
             return []
 
@@ -62,7 +61,7 @@ class AlbumBuffer:
         return messages
 
     def clear(self) -> None:
-        """Clear all buffered messages and group ID."""
+        """Clear the buffer and release resources held by each message."""
         for tm in self.messages:
             tm.clear()
         self.messages.clear()
@@ -79,7 +78,20 @@ async def fetch_album_by_message(
     msg_id: int,
     grouped_id: int,
 ) -> AlbumBuffer:
-    """Fetch all messages in an album given one message from the album."""
+    """Fetch all messages in an album given one message from it.
+
+    Searches ±ALBUM_SEARCH_RADIUS messages around ``msg_id`` and
+    collects those sharing the same ``grouped_id``.
+
+    Args:
+        client: Authenticated Telegram client.
+        entity: The chat/channel containing the album.
+        msg_id: ID of any message in the album.
+        grouped_id: The album's grouped_id.
+
+    Returns:
+        An AlbumBuffer containing the album's messages sorted by ID.
+    """
     from tgcf.plugins import TgcfMessage
 
     album_buffer = AlbumBuffer()
