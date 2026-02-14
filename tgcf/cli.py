@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from rich import console, traceback
 from rich.logging import RichHandler
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 
 from tgcf import __version__
 from tgcf.const import CONFIG_FILE_NAME, CONFIG_ENV_VAR_NAME
@@ -24,6 +25,8 @@ from tgcf.config import (
 )
 from tgcf.context import TgcfContext
 from tgcf.plugins import load_async_plugins
+from tgcf.past import forward_job
+from tgcf.live import start_sync
 
 app = typer.Typer(add_completion=False)
 
@@ -72,53 +75,77 @@ def version_callback(value: bool | None):
         raise typer.Exit()
 
 
+async def _run_past_mode(ctx: TgcfContext, session: str | StringSession) -> None:
+    """Run tgcf in past mode to forward historical messages.
+
+    Args:
+        ctx: Initialized context with config and config_path.
+        session: Telegram session string or bot session name.
+
+    Raises:
+        SystemExit: If a bot account is configured (bots cannot access history).
+    """
+    if ctx.config.login.user_type != 1:
+        logging.critical(
+            "You cannot use bot account for tgcf past mode. "
+            "Telegram does not allow bots to access chat history."
+        )
+        sys.exit(1)
+
+    async with TelegramClient(
+        session, ctx.config.login.API_ID, ctx.config.login.API_HASH
+    ) as client:
+        ctx.bind_client(client)
+        ctx.from_to = await load_from_to(client, ctx.config.forwards)
+        await forward_job(ctx)
+
+
+async def _run_live_mode(ctx: TgcfContext, session: str | StringSession) -> None:
+    """Run tgcf in live mode for real-time message forwarding.
+
+    Args:
+        ctx: Initialized context with config and config_path.
+        session: Telegram session string or bot session name.
+
+    Raises:
+        SystemExit: If bot token is missing when user_type is bot.
+    """
+    client = TelegramClient(
+        session,
+        ctx.config.login.API_ID,
+        ctx.config.login.API_HASH,
+        sequential_updates=ctx.config.live.sequential_updates,
+    )
+    ctx.bind_client(client)
+
+    if ctx.config.login.user_type == 0:
+        if not ctx.config.login.BOT_TOKEN:
+            logging.critical("Bot token not found, but login type is set to bot.")
+            sys.exit(1)
+        await ctx.client.start(bot_token=ctx.config.login.BOT_TOKEN)
+    else:
+        await ctx.client.start()
+
+    ctx.is_bot = await ctx.client.is_bot()
+    ctx.admins = await load_admins(ctx.client, ctx.config.admins)
+    ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
+
+    await start_sync(ctx)
+
+
 async def run_forwarding_mode(mode: Mode, config_path: str) -> None:
     """Build context with client and run the appropriate mode."""
-    from tgcf.past import forward_job  # pylint: disable=import-outside-toplevel
-    from tgcf.live import start_sync  # pylint: disable=import-outside-toplevel
-
     ensure_config_exists(config_path)
     config = read_config(config_path)
     await load_async_plugins(config.plugins)
+
     ctx = TgcfContext(config=config, config_path=config_path)
+    session = get_SESSION(config.login)
 
     if mode == Mode.PAST:
-        if config.login.user_type != 1:
-            logging.warning(
-                "You cannot use bot account for tgcf past mode. "
-                "Telegram does not allow bots to access chat history."
-            )
-            return
-
-        session = get_SESSION(config.login)
-        async with TelegramClient(
-            session, config.login.API_ID, config.login.API_HASH
-        ) as client:
-            ctx.bind_client(client)
-            ctx.from_to = await load_from_to(client, config.forwards)
-            await forward_job(ctx)
+        await _run_past_mode(ctx, session)
     else:
-        session = get_SESSION(config.login)
-        ctx.bind_client(TelegramClient(
-            session,
-            config.login.API_ID,
-            config.login.API_HASH,
-            sequential_updates=config.live.sequential_updates,
-        ))
-
-        if config.login.user_type == 0:
-            if config.login.BOT_TOKEN == "":
-                logging.warning("Bot token not found, but login type is set to bot.")
-                sys.exit()
-            await ctx.client.start(bot_token=config.login.BOT_TOKEN)
-        else:
-            await ctx.client.start()
-
-        ctx.is_bot = await ctx.client.is_bot()
-        ctx.admins = await load_admins(ctx.client, config.admins)
-        ctx.from_to = await load_from_to(ctx.client, config.forwards)
-
-        await start_sync(ctx)
+        await _run_live_mode(ctx, session)
 
 
 @app.command()
