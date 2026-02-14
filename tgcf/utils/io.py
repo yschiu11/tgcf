@@ -14,7 +14,7 @@ def platform_info() -> str:
     """Return a multi-line string describing the runtime environment."""
     nl = "\n"
     return f"""Running tgcf {__version__}\
-    \nPython {sys.version.replace(nl,"")}\
+    \nPython {sys.version.replace(nl, "")}\
     \nOS {os.name}\
     \nPlatform {platform.system()} {platform.release()}\
     \n{platform.architecture()} {platform.processor()}"""

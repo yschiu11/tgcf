@@ -104,9 +104,7 @@ async def fetch_album_by_message(
 
     # Filter and wrap in TgcfMessage
     album_messages: list[TgcfMessage] = [
-        TgcfMessage(m)
-        for m in messages
-        if m is not None and m.grouped_id == grouped_id
+        TgcfMessage(m) for m in messages if m is not None and m.grouped_id == grouped_id
     ]
 
     # Sort by message ID to maintain order

@@ -213,9 +213,7 @@ async def forward_album(
 
     for dest in destinations:
         try:
-            forwarded = await client.forward_messages(
-                dest, message_ids, source_chat_id
-            )
+            forwarded = await client.forward_messages(dest, message_ids, source_chat_id)
 
             if not isinstance(forwarded, list):
                 forwarded = [forwarded]
@@ -234,8 +232,7 @@ async def forward_album(
 
         except Exception as err:
             logging.warning(
-                f"Failed to forward album to {dest}: {err}. "
-                "Trying anonymous send..."
+                f"Failed to forward album to {dest}: {err}. Trying anonymous send..."
             )
             # TODO: fallback needs config which we don't have here
             raise
@@ -274,9 +271,7 @@ async def forward_single_message(
             fwded_msg = await send_message(dest, tm, config)
             stored[event_uid][dest] = fwded_msg.id
         except Exception as err:
-            logging.error(
-                f"Failed to forward message {tm.message.id} to {dest}: {err}"
-            )
+            logging.error(f"Failed to forward message {tm.message.id} to {dest}: {err}")
 
 
 async def send_single_message_with_fallback(
@@ -380,9 +375,7 @@ async def send_album_with_fallback(
                 await client.send_file(dest, downloaded_files, caption=captions)
                 logging.info(f"Sent album to {dest} (via download+reupload)")
             except Exception as err:
-                logging.error(
-                    f"Failed to send album via fallback to {dest}: {err}"
-                )
+                logging.error(f"Failed to send album via fallback to {dest}: {err}")
     finally:
         for file_path in downloaded_files:
             if os.path.exists(file_path):
@@ -460,9 +453,7 @@ async def forward_by_link(
     if not message:
         raise ValueError(f"Message not found: {url}")
 
-    logging.info(
-        f"Fetched message: id={message.id}, grouped_id={message.grouped_id}"
-    )
+    logging.info(f"Fetched message: id={message.id}, grouped_id={message.grouped_id}")
 
     if message.grouped_id:
         album_buffer = await fetch_album_by_message(
@@ -474,8 +465,6 @@ async def forward_by_link(
     else:
         for dest in dest_ids:
             try:
-                await send_single_message_with_fallback(
-                    client, message, dest, config
-                )
+                await send_single_message_with_fallback(client, message, dest, config)
             except Exception as err:
                 logging.error(f"Failed to send message to {dest}: {err}")
