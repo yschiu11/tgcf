@@ -27,7 +27,7 @@ from tgcf.plugins import load_async_plugins
 
 app = typer.Typer(add_completion=False)
 
-con = console.Console()
+console = console.Console()
 
 
 def _load_env_and_config_path() -> str:
@@ -44,7 +44,7 @@ class Mode(str, Enum):
     LIVE = "live"
 
 
-def verbosity_callback(value: bool | None):
+def configure_logging(value: bool | None):
     """Set logging level."""
     traceback.install()
     if value:
@@ -68,11 +68,11 @@ def version_callback(value: bool | None):
     """Show current version and exit."""
 
     if value:
-        con.print(__version__)
+        console.print(__version__)
         raise typer.Exit()
 
 
-async def _run(mode: Mode, config_path: str) -> None:
+async def run_forwarding_mode(mode: Mode, config_path: str) -> None:
     """Build context with client and run the appropriate mode."""
     from tgcf.past import forward_job  # pylint: disable=import-outside-toplevel
     from tgcf.live import start_sync  # pylint: disable=import-outside-toplevel
@@ -130,7 +130,7 @@ def main(
         None,
         "--loud",
         "-l",
-        callback=verbosity_callback,
+        callback=configure_logging,
         envvar="LOUD",
         help="Increase output verbosity.",
     ),
@@ -152,7 +152,7 @@ def main(
     """
     config_path = _load_env_and_config_path()
 
-    asyncio.run(_run(mode, config_path))
+    asyncio.run(run_forwarding_mode(mode, config_path))
 
 
 @app.command()
@@ -165,7 +165,7 @@ def link(
         None,
         "--loud",
         "-l",
-        callback=verbosity_callback,
+        callback=configure_logging,
         help="Increase output verbosity.",
     ),
 ):
