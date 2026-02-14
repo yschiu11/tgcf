@@ -57,6 +57,9 @@ def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
     - Public: https://t.me/channel_username/123
     - Private: https://t.me/c/1234567890/123
 
+    Args:
+        url: Telegram post link.
+
     Returns:
         Tuple of (channel_identifier, message_id) or None if invalid.
     """
