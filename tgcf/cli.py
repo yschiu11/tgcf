@@ -147,10 +147,6 @@ def main(
     env_path = os.path.join(os.getcwd(), ".env")
     load_dotenv(env_path)
 
-    if bool(os.getenv("FAKE")):
-        logging.critical(f"You are running fake with {mode} mode")
-        sys.exit(1)
-
     # Determine config path from env or use default
     config_path = os.getenv("TGCF_CONFIG", CONFIG_FILE_NAME)
 
@@ -184,10 +180,6 @@ def link(
     # Load environment from .env in current directory
     env_path = os.path.join(os.getcwd(), ".env")
     load_dotenv(env_path)
-
-    if bool(os.getenv("FAKE")):
-        logging.critical("You are running fake with link mode")
-        sys.exit(1)
 
     from tgcf.link import forward_link_job  # pylint: disable=import-outside-toplevel
 
