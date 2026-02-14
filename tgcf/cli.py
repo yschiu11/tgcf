@@ -44,7 +44,7 @@ class Mode(str, Enum):
     LIVE = "live"
 
 
-def verbosity_callback(value: bool):
+def verbosity_callback(value: bool | None):
     """Set logging level."""
     traceback.install()
     if value:
@@ -64,7 +64,7 @@ def verbosity_callback(value: bool):
     logging.info("Verbosity turned on! This is suitable for debugging")
 
 
-def version_callback(value: bool):
+def version_callback(value: bool | None):
     """Show current version and exit."""
 
     if value:
