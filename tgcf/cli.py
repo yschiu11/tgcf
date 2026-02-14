@@ -30,12 +30,6 @@ app = typer.Typer(add_completion=False)
 con = console.Console()
 
 
-def topper():
-    print("tgcf")
-    version_check()
-    print("\n")
-
-
 class Mode(str, Enum):
     """tgcf works in two modes."""
 
@@ -60,7 +54,6 @@ def verbosity_callback(value: bool):
             )
         ],
     )
-    topper()
     logging.info("Verbosity turned on! This is suitable for debugging")
 
 
@@ -70,11 +63,6 @@ def version_callback(value: bool):
     if value:
         con.print(__version__)
         raise typer.Exit()
-
-
-def version_check():
-    """Deprecated: This function is no longer used due to dependency issues."""
-    pass
 
 
 async def _run(mode: Mode, config_path: str) -> None:
@@ -204,6 +192,3 @@ def link(
     from tgcf.link import forward_link_job  # pylint: disable=import-outside-toplevel
 
     asyncio.run(forward_link_job(url, dest))
-
-
-# AAHNIK 2021
