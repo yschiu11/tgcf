@@ -14,7 +14,7 @@ from rich.logging import RichHandler
 from telethon import TelegramClient
 
 from tgcf import __version__
-from tgcf.const import CONFIG_FILE_NAME
+from tgcf.const import CONFIG_FILE_NAME, CONFIG_ENV_VAR_NAME
 from tgcf.config import (
     ensure_config_exists,
     read_config,
@@ -28,6 +28,13 @@ from tgcf.plugins import load_async_plugins
 app = typer.Typer(add_completion=False)
 
 con = console.Console()
+
+
+def _load_env_and_config_path() -> str:
+    """Load .env from CWD and return the resolved config file path."""
+    env_path = os.path.join(os.getcwd(), ".env")
+    load_dotenv(env_path)
+    return os.getenv(CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME)
 
 
 class Mode(str, Enum):
@@ -143,12 +150,7 @@ def main(
 
     To run web interface run `tgcf-web` command.
     """
-    # Load environment from .env in current directory
-    env_path = os.path.join(os.getcwd(), ".env")
-    load_dotenv(env_path)
-
-    # Determine config path from env or use default
-    config_path = os.getenv("TGCF_CONFIG", CONFIG_FILE_NAME)
+    config_path = _load_env_and_config_path()
 
     asyncio.run(_run(mode, config_path))
 
@@ -177,10 +179,8 @@ def link(
 
         tgcf link "https://t.me/c/1234567890/456" -d -100123456 -d @backup_channel
     """
-    # Load environment from .env in current directory
-    env_path = os.path.join(os.getcwd(), ".env")
-    load_dotenv(env_path)
+    config_path = _load_env_and_config_path()
 
     from tgcf.link import forward_link_job  # pylint: disable=import-outside-toplevel
 
-    asyncio.run(forward_link_job(url, dest))
+    asyncio.run(forward_link_job(url, dest, config_path))
