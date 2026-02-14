@@ -3,11 +3,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from tgcf.context import TgcfContext
 
-from tgcf.utils import AlbumBuffer
+from tgcf.utils.buffer import AlbumBuffer
 from telethon.tl.custom.message import Message
 from telethon.tl.patched import MessageService
 from dataclasses import dataclass
-from tgcf.utils import forward_single_message, send_album
+from tgcf.utils.sender import forward_single_message, send_album
 from tgcf.plugins import apply_plugins
 from tgcf import const
 from enum import Enum, auto

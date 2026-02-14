@@ -9,7 +9,7 @@ from watermark import File, Position, Watermark, apply_watermark
 
 from tgcf.plugin_models import MarkConfig, FileType
 from tgcf.plugins import TgcfMessage, TgcfPlugin
-from tgcf.utils import cleanup
+from tgcf.utils.io import cleanup
 
 
 def download_image(url: str, filename: str = "image.png") -> bool:

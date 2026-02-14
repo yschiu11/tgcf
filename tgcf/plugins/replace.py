@@ -5,7 +5,7 @@ from pydantic import BaseModel  # pylint: disable=no-name-in-module
 
 from tgcf.plugin_models import Replace
 from tgcf.plugins import TgcfMessage, TgcfPlugin
-from tgcf.utils import replace
+from tgcf.utils.text import replace
 
 
 class TgcfReplace(TgcfPlugin):
