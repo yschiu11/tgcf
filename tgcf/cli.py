@@ -5,35 +5,39 @@ import logging
 import os
 import sys
 from enum import Enum
-from typing import Optional
 
 import typer
 from dotenv import load_dotenv
-from rich import console, traceback
+from rich import traceback
+from rich.console import Console
 from rich.logging import RichHandler
 from telethon import TelegramClient
+from telethon.sessions import StringSession
 
 from tgcf import __version__
-from tgcf.const import CONFIG_FILE_NAME
 from tgcf.config import (
     ensure_config_exists,
-    read_config,
     get_SESSION,
-    load_from_to,
     load_admins,
+    load_from_to,
+    read_config,
 )
+from tgcf.const import CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME
 from tgcf.context import TgcfContext
+from tgcf.link import forward_link_job
+from tgcf.live import start_sync
+from tgcf.past import forward_job
 from tgcf.plugins import load_async_plugins
 
 app = typer.Typer(add_completion=False)
+console = Console()
 
-con = console.Console()
 
-
-def topper():
-    print("tgcf")
-    version_check()
-    print("\n")
+def _load_env_and_config_path() -> str:
+    """Load .env from CWD and return the resolved config file path."""
+    env_path = os.path.join(os.getcwd(), ".env")
+    load_dotenv(env_path)
+    return os.getenv(CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME)
 
 
 class Mode(str, Enum):
@@ -43,11 +47,12 @@ class Mode(str, Enum):
     LIVE = "live"
 
 
-def verbosity_callback(value: bool):
+def configure_logging(value: bool | None):
     """Set logging level."""
     traceback.install()
     if value:
         level = logging.INFO
+        logging.info("Verbosity turned on! This is suitable for debugging")
     else:
         level = logging.WARNING
     logging.basicConfig(
@@ -60,70 +65,87 @@ def verbosity_callback(value: bool):
             )
         ],
     )
-    topper()
-    logging.info("Verbosity turned on! This is suitable for debugging")
 
 
-def version_callback(value: bool):
+def version_callback(value: bool | None):
     """Show current version and exit."""
 
     if value:
-        con.print(__version__)
+        console.print(__version__)
         raise typer.Exit()
 
 
-def version_check():
-    """Deprecated: This function is no longer used due to dependency issues."""
-    pass
+async def _run_past_mode(ctx: TgcfContext, session: str | StringSession) -> None:
+    """Run tgcf in past mode to forward historical messages.
+
+    Args:
+        ctx: Initialized context with config and config_path.
+        session: Telegram session string or bot session name.
+
+    Raises:
+        SystemExit: If a bot account is configured (bots cannot access history).
+    """
+    if ctx.config.login.user_type != 1:
+        logging.critical(
+            "You cannot use bot account for tgcf past mode. "
+            "Telegram does not allow bots to access chat history."
+        )
+        sys.exit(1)
+
+    async with TelegramClient(
+        session, ctx.config.login.API_ID, ctx.config.login.API_HASH
+    ) as client:
+        ctx.bind_client(client)
+        ctx.from_to = await load_from_to(client, ctx.config.forwards)
+        await forward_job(ctx)
 
 
-async def _run(mode: Mode, config_path: str) -> None:
+async def _run_live_mode(ctx: TgcfContext, session: str | StringSession) -> None:
+    """Run tgcf in live mode for real-time message forwarding.
+
+    Args:
+        ctx: Initialized context with config and config_path.
+        session: Telegram session string or bot session name.
+
+    Raises:
+        SystemExit: If bot token is missing when user_type is bot.
+    """
+    client = TelegramClient(
+        session,
+        ctx.config.login.API_ID,
+        ctx.config.login.API_HASH,
+        sequential_updates=ctx.config.live.sequential_updates,
+    )
+    ctx.bind_client(client)
+
+    if ctx.config.login.user_type == 0:
+        if not ctx.config.login.BOT_TOKEN:
+            logging.critical("Bot token not found, but login type is set to bot.")
+            sys.exit(1)
+        await ctx.client.start(bot_token=ctx.config.login.BOT_TOKEN)
+    else:
+        await ctx.client.start()
+
+    ctx.is_bot = await ctx.client.is_bot()
+    ctx.admins = await load_admins(ctx.client, ctx.config.admins)
+    ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
+
+    await start_sync(ctx)
+
+
+async def run_forwarding_mode(mode: Mode, config_path: str) -> None:
     """Build context with client and run the appropriate mode."""
-    from tgcf.past import forward_job  # pylint: disable=import-outside-toplevel
-    from tgcf.live import start_sync  # pylint: disable=import-outside-toplevel
-
     ensure_config_exists(config_path)
     config = read_config(config_path)
     await load_async_plugins(config.plugins)
+
     ctx = TgcfContext(config=config, config_path=config_path)
+    session = get_SESSION(config.login)
 
     if mode == Mode.PAST:
-        if config.login.user_type != 1:
-            logging.warning(
-                "You cannot use bot account for tgcf past mode. "
-                "Telegram does not allow bots to access chat history."
-            )
-            return
-
-        session = get_SESSION(config.login)
-        async with TelegramClient(
-            session, config.login.API_ID, config.login.API_HASH
-        ) as client:
-            ctx.bind_client(client)
-            ctx.from_to = await load_from_to(client, config.forwards)
-            await forward_job(ctx)
+        await _run_past_mode(ctx, session)
     else:
-        session = get_SESSION(config.login)
-        ctx.bind_client(TelegramClient(
-            session,
-            config.login.API_ID,
-            config.login.API_HASH,
-            sequential_updates=config.live.sequential_updates,
-        ))
-
-        if config.login.user_type == 0:
-            if config.login.BOT_TOKEN == "":
-                logging.warning("Bot token not found, but login type is set to bot.")
-                sys.exit()
-            await ctx.client.start(bot_token=config.login.BOT_TOKEN)
-        else:
-            await ctx.client.start()
-
-        ctx.is_bot = await ctx.client.is_bot()
-        ctx.admins = await load_admins(ctx.client, config.admins)
-        ctx.from_to = await load_from_to(ctx.client, config.forwards)
-
-        await start_sync(ctx)
+        await _run_live_mode(ctx, session)
 
 
 @app.command()
@@ -131,15 +153,15 @@ def main(
     mode: Mode = typer.Argument(
         ..., help="Choose the mode in which you want to run tgcf.", envvar="TGCF_MODE"
     ),
-    verbose: Optional[bool] = typer.Option(  # pylint: disable=unused-argument
+    verbose: bool | None = typer.Option(  # pylint: disable=unused-argument
         None,
         "--loud",
         "-l",
-        callback=verbosity_callback,
+        callback=configure_logging,
         envvar="LOUD",
         help="Increase output verbosity.",
     ),
-    version: Optional[bool] = typer.Option(  # pylint: disable=unused-argument
+    version: bool | None = typer.Option(  # pylint: disable=unused-argument
         None,
         "--version",
         "-v",
@@ -155,18 +177,9 @@ def main(
 
     To run web interface run `tgcf-web` command.
     """
-    # Load environment from .env in current directory
-    env_path = os.path.join(os.getcwd(), ".env")
-    load_dotenv(env_path)
+    config_path = _load_env_and_config_path()
 
-    if bool(os.getenv("FAKE")):
-        logging.critical(f"You are running fake with {mode} mode")
-        sys.exit(1)
-
-    # Determine config path from env or use default
-    config_path = os.getenv("TGCF_CONFIG", CONFIG_FILE_NAME)
-
-    asyncio.run(_run(mode, config_path))
+    asyncio.run(run_forwarding_mode(mode, config_path))
 
 
 @app.command()
@@ -175,11 +188,11 @@ def link(
     dest: list[str] = typer.Option(
         ..., "--dest", "-d", help="Destination chat ID or username (can specify multiple)"
     ),
-    verbose: Optional[bool] = typer.Option(
+    verbose: bool | None = typer.Option(
         None,
         "--loud",
         "-l",
-        callback=verbosity_callback,
+        callback=configure_logging,
         help="Increase output verbosity.",
     ),
 ):
@@ -193,17 +206,6 @@ def link(
 
         tgcf link "https://t.me/c/1234567890/456" -d -100123456 -d @backup_channel
     """
-    # Load environment from .env in current directory
-    env_path = os.path.join(os.getcwd(), ".env")
-    load_dotenv(env_path)
+    config_path = _load_env_and_config_path()
 
-    if bool(os.getenv("FAKE")):
-        logging.critical("You are running fake with link mode")
-        sys.exit(1)
-
-    from tgcf.link import forward_link_job  # pylint: disable=import-outside-toplevel
-
-    asyncio.run(forward_link_job(url, dest))
-
-
-# AAHNIK 2021
+    asyncio.run(forward_link_job(url, dest, config_path))
