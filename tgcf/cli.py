@@ -5,32 +5,33 @@ import logging
 import os
 import sys
 from enum import Enum
-from typing import Optional
 
 import typer
 from dotenv import load_dotenv
-from rich import console, traceback
+from rich import traceback
+from rich.console import Console
 from rich.logging import RichHandler
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
 from tgcf import __version__
-from tgcf.const import CONFIG_FILE_NAME, CONFIG_ENV_VAR_NAME
 from tgcf.config import (
+    Config,
     ensure_config_exists,
-    read_config,
     get_SESSION,
-    load_from_to,
     load_admins,
+    load_from_to,
+    read_config,
 )
+from tgcf.const import CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME
 from tgcf.context import TgcfContext
-from tgcf.plugins import load_async_plugins
-from tgcf.past import forward_job
+from tgcf.link import forward_link_job
 from tgcf.live import start_sync
+from tgcf.past import forward_job
+from tgcf.plugins import load_async_plugins
 
 app = typer.Typer(add_completion=False)
-
-console = console.Console()
+console = Console()
 
 
 def _load_env_and_config_path() -> str:
@@ -153,7 +154,7 @@ def main(
     mode: Mode = typer.Argument(
         ..., help="Choose the mode in which you want to run tgcf.", envvar="TGCF_MODE"
     ),
-    verbose: Optional[bool] = typer.Option(  # pylint: disable=unused-argument
+    verbose: bool | None = typer.Option(  # pylint: disable=unused-argument
         None,
         "--loud",
         "-l",
@@ -161,7 +162,7 @@ def main(
         envvar="LOUD",
         help="Increase output verbosity.",
     ),
-    version: Optional[bool] = typer.Option(  # pylint: disable=unused-argument
+    version: bool | None = typer.Option(  # pylint: disable=unused-argument
         None,
         "--version",
         "-v",
@@ -188,7 +189,7 @@ def link(
     dest: list[str] = typer.Option(
         ..., "--dest", "-d", help="Destination chat ID or username (can specify multiple)"
     ),
-    verbose: Optional[bool] = typer.Option(
+    verbose: bool | None = typer.Option(
         None,
         "--loud",
         "-l",
@@ -207,7 +208,5 @@ def link(
         tgcf link "https://t.me/c/1234567890/456" -d -100123456 -d @backup_channel
     """
     config_path = _load_env_and_config_path()
-
-    from tgcf.link import forward_link_job  # pylint: disable=import-outside-toplevel
 
     asyncio.run(forward_link_job(url, dest, config_path))
