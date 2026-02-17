@@ -2,8 +2,7 @@
 
 import logging
 import os
-import sys
-from typing import Dict, List, Optional, Union, Any
+from typing import Dict, List, Optional, Union
 import tempfile
 
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module

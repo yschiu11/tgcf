@@ -7,7 +7,6 @@
 import asyncio
 import logging
 
-from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError
 
 from tgcf.context import TgcfContext

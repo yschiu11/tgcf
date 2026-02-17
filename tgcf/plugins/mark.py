@@ -1,13 +1,11 @@
 import logging
 import os
 import shutil
-from typing import Any, Dict
 
 import requests
-from pydantic import BaseModel  # pylint: disable=no-name-in-module
-from watermark import File, Position, Watermark, apply_watermark
+from watermark import File, Watermark, apply_watermark
 
-from tgcf.plugin_models import MarkConfig, FileType
+from tgcf.plugin_models import FileType
 from tgcf.plugins import TgcfMessage, TgcfPlugin
 from tgcf.utils.io import cleanup
 

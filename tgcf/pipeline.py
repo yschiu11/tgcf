@@ -1,8 +1,3 @@
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from tgcf.context import TgcfContext
-
 from tgcf.utils.buffer import AlbumBuffer
 from telethon.tl.custom.message import Message
 from telethon.tl.patched import MessageService

@@ -1,10 +1,6 @@
 import logging
-from enum import Enum
-from typing import Any, Dict
 
-from pydantic import BaseModel  # pylint: disable=no-name-in-module
-
-from tgcf.plugin_models import STYLE_CODES, Format, Style
+from tgcf.plugin_models import STYLE_CODES, Style
 from tgcf.plugins import TgcfMessage, TgcfPlugin
 
 

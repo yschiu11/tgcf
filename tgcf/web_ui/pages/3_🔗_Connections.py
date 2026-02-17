@@ -1,5 +1,3 @@
-import time
-
 import streamlit as st
 
 from tgcf.config import Forward

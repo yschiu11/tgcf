@@ -3,7 +3,7 @@
 import asyncio
 import logging
 
-from telethon import TelegramClient, events, functions, types
+from telethon import events, functions, types
 from telethon.tl.custom.message import Message
 
 from tgcf import const
