@@ -1,9 +1,9 @@
+from __future__ import annotations
+
 """Telegram message sending, forwarding, and fallback logic."""
 
 import logging
 import os
-from typing import TYPE_CHECKING
-
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
 from telethon.tl.custom.message import Message
@@ -13,8 +13,7 @@ from tgcf.config import Config
 from tgcf.utils.buffer import fetch_album_by_message
 from tgcf.utils.text import parse_telegram_link
 
-if TYPE_CHECKING:
-    from tgcf.plugins import TgcfMessage
+from tgcf.plugins import TgcfMessage
 
 # Maps (source_chat_id, source_msg_id) -> {dest_chat_id: dest_msg_id}
 ForwardMap = dict[tuple[int, int], dict[int, int | None]]
@@ -22,7 +21,7 @@ ForwardMap = dict[tuple[int, int], dict[int, int | None]]
 
 async def send_message(
     recipient: EntityLike,
-    tm: "TgcfMessage",
+    tm: TgcfMessage,
     config: Config,
 ) -> Message:
     """Send a message to a recipient, forwarding or copying per config.
@@ -61,7 +60,7 @@ async def send_message(
 
 async def send_album(
     client: TelegramClient,
-    messages: list["TgcfMessage"],
+    messages: list[TgcfMessage],
     destinations: list[int],
     config: Config,
     stored: ForwardMap,
@@ -115,7 +114,7 @@ def get_reply_to_mapping(
 
 async def forward_album_anonymous(
     client: TelegramClient,
-    messages: list["TgcfMessage"],
+    messages: list[TgcfMessage],
     destinations: list[int],
     config: Config,
     stored: ForwardMap,
@@ -193,7 +192,7 @@ async def forward_album_anonymous(
 
 async def forward_album(
     client: TelegramClient,
-    messages: list["TgcfMessage"],
+    messages: list[TgcfMessage],
     destinations: list[int],
     stored: ForwardMap,
 ) -> None:
@@ -239,7 +238,7 @@ async def forward_album(
 
 
 async def forward_single_message(
-    tm: "TgcfMessage",
+    tm: TgcfMessage,
     destinations: list[int],
     config: Config,
     stored: ForwardMap,
@@ -291,8 +290,6 @@ async def send_single_message_with_fallback(
     Raises:
         ValueError: If the message is text-only (no media to reupload).
     """
-    from tgcf.plugins import TgcfMessage
-
     tm = TgcfMessage(message)
     tm.client = client
 
@@ -328,7 +325,7 @@ async def send_single_message_with_fallback(
 
 async def send_album_with_fallback(
     client: TelegramClient,
-    messages: list["TgcfMessage"],
+    messages: list[TgcfMessage],
     dest_ids: list[int],
     config: Config,
     stored: ForwardMap,

@@ -1,12 +1,10 @@
-"""Album buffering and grouped-message detection."""
+from __future__ import annotations
 
-from typing import TYPE_CHECKING
+"""Album buffering and grouped-message detection."""
 
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
-
-if TYPE_CHECKING:
-    from tgcf.plugins import TgcfMessage
+from tgcf.plugins import TgcfMessage
 
 # Telegram albums can have up to 10 items. We search ±10 messages around
 # the target to ensure we capture the full album even if there are gaps.
@@ -17,10 +15,10 @@ class AlbumBuffer:
     """Manage buffering and detection of media albums (grouped messages)."""
 
     def __init__(self) -> None:
-        self.messages: list["TgcfMessage"] = []
+        self.messages: list[TgcfMessage] = []
         self.current_group_id: int | None = None
 
-    def add_message(self, tm: "TgcfMessage") -> None:
+    def add_message(self, tm: TgcfMessage) -> None:
         """Add a message to the current album buffer."""
         self.messages.append(tm)
         self.current_group_id = tm.message.grouped_id
@@ -51,7 +49,7 @@ class AlbumBuffer:
         """Check if buffer is empty."""
         return len(self.messages) == 0
 
-    def flush(self) -> list["TgcfMessage"]:
+    def flush(self) -> list[TgcfMessage]:
         """Return all buffered messages and reset the buffer."""
         if not self.messages:
             return []
@@ -67,7 +65,7 @@ class AlbumBuffer:
         self.messages.clear()
         self.current_group_id = None
 
-    def get_messages(self) -> list["TgcfMessage"]:
+    def get_messages(self) -> list[TgcfMessage]:
         """Get all buffered messages."""
         return self.messages
 
@@ -92,8 +90,6 @@ async def fetch_album_by_message(
     Returns:
         An AlbumBuffer containing the album's messages sorted by ID.
     """
-    from tgcf.plugins import TgcfMessage
-
     album_buffer = AlbumBuffer()
 
     # Fetch nearby messages to find all album members
