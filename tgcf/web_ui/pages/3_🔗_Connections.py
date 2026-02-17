@@ -6,9 +6,9 @@ from tgcf.web_ui.utils import (
     get_list,
     get_string,
     hide_st,
-    switch_theme,
     load_config_to_session,
-    save_session_config
+    save_session_config,
+    switch_theme,
 )
 
 CONFIG = load_config_to_session()

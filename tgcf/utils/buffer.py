@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
+
 from tgcf.plugins import TgcfMessage
 
 # Telegram albums can have up to 10 items. We search ±10 messages around

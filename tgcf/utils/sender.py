@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import logging
 import os
+
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
 from telethon.tl.custom.message import Message
 from telethon.utils import get_peer_id
 
 from tgcf.config import Config
+from tgcf.plugins import TgcfMessage
 from tgcf.utils.buffer import fetch_album_by_message
 from tgcf.utils.text import parse_telegram_link
-
-from tgcf.plugins import TgcfMessage
 
 # Maps (source_chat_id, source_msg_id) -> {dest_chat_id: dest_msg_id}
 ForwardMap = dict[tuple[int, int], dict[int, int | None]]

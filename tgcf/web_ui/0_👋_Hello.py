@@ -1,6 +1,7 @@
 import streamlit as st
 
-from tgcf.web_ui.utils import hide_st, switch_theme, load_config_to_session
+from tgcf.web_ui.utils import hide_st, load_config_to_session, switch_theme
+
 CONFIG = load_config_to_session()
 
 st.set_page_config(

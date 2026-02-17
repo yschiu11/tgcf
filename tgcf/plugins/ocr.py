@@ -1,8 +1,8 @@
 import pytesseract
 from PIL import Image
 
-from tgcf.plugins import TgcfMessage, TgcfPlugin
 from tgcf.plugin_models import FileType
+from tgcf.plugins import TgcfMessage, TgcfPlugin
 from tgcf.utils.io import cleanup
 
 

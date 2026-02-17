@@ -11,7 +11,7 @@ from typing import Any, Dict
 
 from telethon.tl.custom.message import Message
 
-from tgcf.plugin_models import FileType, ASYNC_PLUGIN_IDS, PluginConfig
+from tgcf.plugin_models import ASYNC_PLUGIN_IDS, FileType, PluginConfig
 from tgcf.utils.io import cleanup, stamp
 
 

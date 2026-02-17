@@ -1,10 +1,12 @@
 import logging
 import sys
 
-from tgcf.plugins import TgcfMessage, TgcfPlugin
-from tgcf.config import read_config, get_SESSION
 from telethon import TelegramClient
+
+from tgcf.config import get_SESSION, read_config
 from tgcf.plugin_models import FileType
+from tgcf.plugins import TgcfMessage, TgcfPlugin
+
 
 class TgcfSender(TgcfPlugin):
     id_ = "sender"

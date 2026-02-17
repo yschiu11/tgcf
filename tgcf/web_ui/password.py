@@ -1,7 +1,6 @@
 import logging
 import os
 
-
 # Web UI password - read from environment with default fallback
 PASSWORD = os.getenv("PASSWORD", "tgcf")
 

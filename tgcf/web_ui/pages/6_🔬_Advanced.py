@@ -5,11 +5,11 @@ import streamlit as st
 from tgcf.utils.io import platform_info
 from tgcf.web_ui.password import check_password
 from tgcf.web_ui.utils import (
+    get_config_path,
     hide_st,
-    switch_theme,
     load_config_to_session,
     save_session_config,
-    get_config_path,
+    switch_theme,
 )
 
 CONFIG = load_config_to_session()

@@ -12,6 +12,7 @@ from telethon.errors.rpcerrorlist import FloodWaitError
 from tgcf.context import TgcfContext
 from tgcf.pipeline import MessagePacket
 
+
 async def forward_job(ctx: TgcfContext) -> None:
     """
     Forward all existing messages in the concerned chats.

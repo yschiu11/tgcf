@@ -1,12 +1,15 @@
-from tgcf.utils.buffer import AlbumBuffer
+import logging
+from dataclasses import dataclass
+from enum import Enum, auto
+
 from telethon.tl.custom.message import Message
 from telethon.tl.patched import MessageService
-from dataclasses import dataclass
-from tgcf.utils.sender import forward_single_message, send_album
-from tgcf.plugins import apply_plugins
+
 from tgcf import const
-from enum import Enum, auto
-import logging
+from tgcf.plugins import apply_plugins
+from tgcf.utils.buffer import AlbumBuffer
+from tgcf.utils.sender import forward_single_message, send_album
+
 
 class MessageHistory:
     def __init__(self):
