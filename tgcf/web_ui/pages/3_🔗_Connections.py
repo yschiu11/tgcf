@@ -34,11 +34,11 @@ if check_password(st):
     else:
         tab_strings = []
         for i in range(num):
-            if CONFIG.forwards[i].con_name:
-                label = CONFIG.forwards[i].con_name
+            if CONFIG.forwards[i].config_name:
+                label = CONFIG.forwards[i].config_name
             else:
                 label = f"Connection {i+1}"
-            if CONFIG.forwards[i].use_this:
+            if CONFIG.forwards[i].enabled:
                 status = "🟢"
             else:
                 status = "🟡"
@@ -50,25 +50,25 @@ if check_password(st):
         for i in range(num):
             with tabs[i]:
                 con = i + 1
-                name = CONFIG.forwards[i].con_name
+                name = CONFIG.forwards[i].config_name
                 if name:
                     label = f"{con} [{name}]"
                 else:
                     label = con
                 with st.expander("Modify Metadata"):
                     st.write(f"Connection ID: **{con}**")
-                    CONFIG.forwards[i].con_name = st.text_input(
+                    CONFIG.forwards[i].config_name = st.text_input(
                         "Name of this connection",
-                        value=CONFIG.forwards[i].con_name,
+                        value=CONFIG.forwards[i].config_name,
                         key=con,
                     )
 
                     st.info(
                         "You can untick the below checkbox to suspend this connection."
                     )
-                    CONFIG.forwards[i].use_this = st.checkbox(
+                    CONFIG.forwards[i].enabled = st.checkbox(
                         "Use this connection",
-                        value=CONFIG.forwards[i].use_this,
+                        value=CONFIG.forwards[i].enabled,
                         key=f"use {con}",
                     )
                 with st.expander("Source and Destination"):
@@ -78,6 +78,7 @@ if check_password(st):
                         "Source",
                         value=CONFIG.forwards[i].source,
                         key=f"source {con}",
+                        placeholder="@username, t.me/xxx, or -1001234567890",
                     ).strip()
                     st.write("only one source is allowed in a connection")
                     CONFIG.forwards[i].dest = get_list(

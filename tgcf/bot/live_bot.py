@@ -12,7 +12,7 @@ from tgcf.bot.utils import (
     make_admin_protect,
     remove_source,
 )
-from tgcf.config import Forward, load_from_to
+from tgcf.config import Forward, resolve_forward_rules
 from tgcf.context import TgcfContext
 from tgcf.plugin_models import Style
 
@@ -50,7 +50,7 @@ def make_forward_command_handler(ctx: TgcfContext):
             except Exception as err:
                 logging.error(err)
             ctx.config.forwards.append(forward)
-            ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
+            ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
             await event.respond("Success")
             ctx.save_config()
@@ -88,7 +88,7 @@ def make_remove_command_handler(ctx: TgcfContext):
             parsed_args = yaml.safe_load(args)
             source_to_remove = parsed_args.get("source")
             ctx.config.forwards = remove_source(source_to_remove, ctx.config.forwards)
-            ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
+            ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
             await event.respond("Success")
             ctx.save_config()

@@ -26,8 +26,8 @@ switch_theme(st,CONFIG)
 if check_password(st):
 
     with st.expander("Filter"):
-        CONFIG.plugins.filter.check = st.checkbox(
-            "Use this plugin: filter", value=CONFIG.plugins.filter.check
+        CONFIG.plugins.filter.enabled = st.checkbox(
+            "Use this plugin: filter", value=CONFIG.plugins.filter.enabled
         )
         st.write("Blacklist or whitelist certain text items.")
         text_tab, users_tab, files_tab = st.tabs(["Text", "Users", "Files"])
@@ -78,15 +78,15 @@ if check_password(st):
             )
 
     with st.expander("Format"):
-        CONFIG.plugins.fmt.check = st.checkbox(
-            "Use this plugin: format", value=CONFIG.plugins.fmt.check
+        CONFIG.plugins.format.enabled = st.checkbox(
+            "Use this plugin: format", value=CONFIG.plugins.format.enabled
         )
         st.write(
             "Add style to text like **bold**, _italics_, ~~strikethrough~~, `monospace` etc."
         )
         style_list = [item.value for item in Style]
-        CONFIG.plugins.fmt.style = st.selectbox(
-            "Format", style_list, index=style_list.index(CONFIG.plugins.fmt.style)
+        CONFIG.plugins.format.style = st.selectbox(
+            "Format", style_list, index=style_list.index(CONFIG.plugins.format.style)
         )
 
     with st.expander("Watermark"):
@@ -94,9 +94,9 @@ if check_password(st):
             st.warning(
                 "Could not find `ffmpeg`. Make sure to have `ffmpeg` installed in server to use this plugin."
             )
-        CONFIG.plugins.mark.check = st.checkbox(
+        CONFIG.plugins.mark.enabled = st.checkbox(
             "Apply watermark to media (images and videos).",
-            value=CONFIG.plugins.mark.check,
+            value=CONFIG.plugins.mark.enabled,
         )
         uploaded_file = st.file_uploader("Upload watermark image(png)", type=["png"])
         if uploaded_file is not None:
@@ -109,14 +109,14 @@ if check_password(st):
             st.warning(
                 "Could not find `tesseract`. Make sure to have `tesseract` installed in server to use this plugin."
             )
-        CONFIG.plugins.ocr.check = st.checkbox(
-            "Activate OCR for images", value=CONFIG.plugins.ocr.check
+        CONFIG.plugins.ocr.enabled = st.checkbox(
+            "Activate OCR for images", value=CONFIG.plugins.ocr.enabled
         )
         st.write("The text will be added in desciption of image while forwarding.")
 
     with st.expander("Replace"):
-        CONFIG.plugins.replace.check = st.checkbox(
-            "Apply text replacement", value=CONFIG.plugins.replace.check
+        CONFIG.plugins.replace.enabled = st.checkbox(
+            "Apply text replacement", value=CONFIG.plugins.replace.enabled
         )
         CONFIG.plugins.replace.regex = st.checkbox(
             "Interpret as regex", value=CONFIG.plugins.replace.regex
@@ -156,8 +156,8 @@ if check_password(st):
             )
 
     with st.expander("Caption"):
-        CONFIG.plugins.caption.check = st.checkbox(
-            "Apply Captions", value=CONFIG.plugins.caption.check
+        CONFIG.plugins.caption.enabled = st.checkbox(
+            "Apply Captions", value=CONFIG.plugins.caption.enabled
         )
         CONFIG.plugins.caption.header = st.text_area(
             "Header", value=CONFIG.plugins.caption.header
@@ -172,21 +172,21 @@ if check_password(st):
     with st.expander("Sender"):
         st.write("Modify the sender of forwarded messages other than the current user/bot")
         st.warning("Show 'Forwarded from' option must be disabled or else messages will not be sent",icon="⚠️")
-        CONFIG.plugins.sender.check = st.checkbox(
-            "Set sender to:", value=CONFIG.plugins.sender.check
+        CONFIG.plugins.sender.enabled = st.checkbox(
+            "Set sender to:", value=CONFIG.plugins.sender.enabled
         )
         leftpad,content,rightpad = st.columns([0.05,0.9,0.05])
         with content:
             user_type = st.radio("Account Type", ["Bot", "User"], index=CONFIG.plugins.sender.user_type,horizontal=True)
             if user_type == "Bot":
                 CONFIG.plugins.sender.user_type = 0
-                CONFIG.plugins.sender.BOT_TOKEN = st.text_input(
-                    "Bot Token", value=CONFIG.plugins.sender.BOT_TOKEN, type="password"
+                CONFIG.plugins.sender.bot_token = st.text_input(
+                    "Bot Token", value=CONFIG.plugins.sender.bot_token, type="password"
                 )
             else:
                 CONFIG.plugins.sender.user_type = 1
-                CONFIG.plugins.sender.SESSION_STRING = st.text_input(
-                    "Session String", CONFIG.plugins.sender.SESSION_STRING, type="password"
+                CONFIG.plugins.sender.session_string = st.text_input(
+                    "Session String", CONFIG.plugins.sender.session_string, type="password"
                 )
                 st.markdown(
                 """

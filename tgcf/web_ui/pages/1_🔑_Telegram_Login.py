@@ -17,11 +17,11 @@ st.set_page_config(
 hide_st(st)
 switch_theme(st,CONFIG)
 if check_password(st):
-    CONFIG.login.API_ID = int(
-        st.text_input("API ID", value=str(CONFIG.login.API_ID), type="password")
+    CONFIG.login.api_id = int(
+        st.text_input("API ID", value=str(CONFIG.login.api_id), type="password")
     )
-    CONFIG.login.API_HASH = st.text_input(
-        "API HASH", value=CONFIG.login.API_HASH, type="password"
+    CONFIG.login.api_hash = st.text_input(
+        "API HASH", value=CONFIG.login.api_hash, type="password"
     )
     st.write("You can get api id and api hash from https://my.telegram.org.")
 
@@ -30,13 +30,13 @@ if check_password(st):
     )
     if user_type == "Bot":
         CONFIG.login.user_type = 0
-        CONFIG.login.BOT_TOKEN = st.text_input(
-            "Enter bot token", value=CONFIG.login.BOT_TOKEN, type="password"
+        CONFIG.login.bot_token = st.text_input(
+            "Enter bot token", value=CONFIG.login.bot_token, type="password"
         )
     else:
         CONFIG.login.user_type = 1
-        CONFIG.login.SESSION_STRING = st.text_input(
-            "Enter session string", value=CONFIG.login.SESSION_STRING, type="password"
+        CONFIG.login.session_string = st.text_input(
+            "Enter session string", value=CONFIG.login.session_string, type="password"
         )
         with st.expander("How to get session string ?"):
             st.markdown(

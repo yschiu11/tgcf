@@ -17,9 +17,9 @@ from telethon.sessions import StringSession
 from tgcf import __version__
 from tgcf.config import (
     ensure_config_exists,
-    get_SESSION,
+    get_session,
     load_admins,
-    load_from_to,
+    resolve_forward_rules,
     read_config,
 )
 from tgcf.const import CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME
@@ -93,10 +93,10 @@ async def _run_past_mode(ctx: TgcfContext, session: str | StringSession) -> None
         sys.exit(1)
 
     async with TelegramClient(
-        session, ctx.config.login.API_ID, ctx.config.login.API_HASH
+        session, ctx.config.login.api_id, ctx.config.login.api_hash
     ) as client:
         ctx.bind_client(client)
-        ctx.from_to = await load_from_to(client, ctx.config.forwards)
+        ctx.from_to = await resolve_forward_rules(client, ctx.config.forwards)
         await forward_job(ctx)
 
 
@@ -112,23 +112,23 @@ async def _run_live_mode(ctx: TgcfContext, session: str | StringSession) -> None
     """
     client = TelegramClient(
         session,
-        ctx.config.login.API_ID,
-        ctx.config.login.API_HASH,
+        ctx.config.login.api_id,
+        ctx.config.login.api_hash,
         sequential_updates=ctx.config.live.sequential_updates,
     )
     ctx.bind_client(client)
 
     if ctx.config.login.user_type == 0:
-        if not ctx.config.login.BOT_TOKEN:
+        if not ctx.config.login.bot_token:
             logging.critical("Bot token not found, but login type is set to bot.")
             sys.exit(1)
-        await ctx.client.start(bot_token=ctx.config.login.BOT_TOKEN)
+        await ctx.client.start(bot_token=ctx.config.login.bot_token)
     else:
         await ctx.client.start()
 
     ctx.is_bot = await ctx.client.is_bot()
     ctx.admins = await load_admins(ctx.client, ctx.config.admins)
-    ctx.from_to = await load_from_to(ctx.client, ctx.config.forwards)
+    ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
     await start_sync(ctx)
 
@@ -140,7 +140,7 @@ async def run_forwarding_mode(mode: Mode, config_path: str) -> None:
     await load_async_plugins(config.plugins)
 
     ctx = TgcfContext(config=config, config_path=config_path)
-    session = get_SESSION(config.login)
+    session = get_session(config.login)
 
     if mode == Mode.PAST:
         await _run_past_mode(ctx, session)

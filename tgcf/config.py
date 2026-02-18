@@ -5,7 +5,7 @@ import os
 import tempfile
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
+from pydantic import BaseModel, ConfigDict, Field, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.utils import get_peer_id
@@ -23,8 +23,10 @@ class Forward(BaseModel):
     """Blueprint for the forward object."""
 
     # pylint: disable=too-few-public-methods
-    con_name: str = ""
-    use_this: bool = True
+    model_config = ConfigDict(populate_by_name=True)
+
+    config_name: str = Field("", alias="con_name")
+    enabled: bool = Field(True, alias="use_this")
     source: Union[int, str] = ""
     dest: List[Union[int, str]] = []
     offset: int = 0
@@ -56,14 +58,15 @@ class PastSettings(BaseModel):
 
 
 class LoginConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
 
-    API_ID: int = 0
-    API_HASH: str = ""
+    api_id: int = Field(0, alias="API_ID")
+    api_hash: str = Field("", alias="API_HASH")
     user_type: int = 0  # 0:bot, 1:user
     phone_no: int = 91
-    USERNAME: str = ""
-    SESSION_STRING: str = ""
-    BOT_TOKEN: str = ""
+    username: str = Field("", alias="USERNAME")
+    session_string: str = Field("", alias="SESSION_STRING")
+    bot_token: str = Field("", alias="BOT_TOKEN")
 
 
 class BotMessages(BaseModel):
@@ -165,7 +168,7 @@ async def get_id(client: TelegramClient, peer):
         raise
 
 
-async def load_from_to(
+async def resolve_forward_rules(
     client: TelegramClient, forwards: List[Forward]
 ) -> Dict[int, tuple[Forward, list[int]]]:
     """Convert Forward objects to a mapping with resolved IDs.
@@ -184,17 +187,17 @@ async def load_from_to(
     """
     from_to_dict: Dict[int, tuple[Forward, list[int]]] = {}
 
-    async def _(peer):
+    async def resolve_id(peer):
         return await get_id(client, peer)
 
     for forward in forwards:
-        if not forward.use_this:
+        if not forward.enabled:
             continue
         source = forward.source
         if not isinstance(source, int) and source.strip() == "":
             continue
-        src = await _(forward.source)
-        dests = [await _(dest) for dest in forward.dest]
+        src = await resolve_id(forward.source)
+        dests = [await resolve_id(dest) for dest in forward.dest]
         from_to_dict[src] = (forward, dests)
     logging.info(f"Loaded {len(from_to_dict)} active forwards")
     return from_to_dict
@@ -207,17 +210,17 @@ async def load_admins(client: TelegramClient, admins: list[int | str]) -> list[i
     return resolved
 
 
-def get_SESSION(login: LoginConfig, default: str = 'tgcf_bot'):
+def get_session(login: LoginConfig, default: str = 'tgcf_bot'):
     """Get session for Telegram client.
     
     Args:
         login: LoginConfig section from config
         default: Default session name for bot accounts
     """
-    if login.SESSION_STRING and login.user_type == 1:
+    if login.session_string and login.user_type == 1:
         logging.info("using session string")
-        return StringSession(login.SESSION_STRING)
-    elif login.BOT_TOKEN and login.user_type == 0:
+        return StringSession(login.session_string)
+    elif login.bot_token and login.user_type == 0:
         logging.info("using bot account")
         return default
 

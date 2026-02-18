@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Dict, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from watermark import Position
 
 
@@ -47,49 +47,65 @@ STYLE_CODES = {"bold": "**", "italics": "__", "code": "`", "strike": "~~", "plai
 
 
 class Filters(BaseModel):
-    check: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+
+    enabled: bool = Field(False, alias="check")
     users: FilterList = FilterList()
     files: FilesFilterList = FilesFilterList()
     text: TextFilter = TextFilter()
 
 
 class Format(BaseModel):
-    check: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+
+    enabled: bool = Field(False, alias="check")
     style: Style = Style.PRESERVE
 
 
 class MarkConfig(BaseModel):
-    check: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+
+    enabled: bool = Field(False, alias="check")
     image: str = "image.png"
     position: Position = Position.centre
     frame_rate: int = 15
 
 
 class OcrConfig(BaseModel):
-    check: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+
+    enabled: bool = Field(False, alias="check")
 
 
 class Replace(BaseModel):
-    check: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+
+    enabled: bool = Field(False, alias="check")
     text: Dict[str, str] = {}
     text_raw: str = ""
     regex: bool = False
 
 
 class Caption(BaseModel):
-    check: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+
+    enabled: bool = Field(False, alias="check")
     header: str = ""
     footer: str = ""
 
 class Sender(BaseModel):
-    check: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+
+    enabled: bool = Field(False, alias="check")
     user_type: int = 0  # 0:bot, 1:user
-    BOT_TOKEN: str = ""
-    SESSION_STRING: str = ""
+    bot_token: str = Field("", alias="BOT_TOKEN")
+    session_string: str = Field("", alias="SESSION_STRING")
 
 class PluginConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     filter: Filters = Filters()
-    fmt: Format = Format()
+    format: Format = Field(Format(), alias="fmt")
     mark: MarkConfig = MarkConfig()
     ocr: OcrConfig = OcrConfig()
     replace: Replace = Replace()
