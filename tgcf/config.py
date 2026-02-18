@@ -5,7 +5,7 @@ import os
 import tempfile
 from typing import Dict, List, Optional, Union
 
-from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
+from pydantic import BaseModel, ConfigDict, Field, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.utils import get_peer_id
@@ -56,14 +56,15 @@ class PastSettings(BaseModel):
 
 
 class LoginConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
 
-    API_ID: int = 0
-    API_HASH: str = ""
+    api_id: int = Field(0, alias="API_ID")
+    api_hash: str = Field("", alias="API_HASH")
     user_type: int = 0  # 0:bot, 1:user
     phone_no: int = 91
-    USERNAME: str = ""
-    SESSION_STRING: str = ""
-    BOT_TOKEN: str = ""
+    username: str = Field("", alias="USERNAME")
+    session_string: str = Field("", alias="SESSION_STRING")
+    bot_token: str = Field("", alias="BOT_TOKEN")
 
 
 class BotMessages(BaseModel):
@@ -214,10 +215,10 @@ def get_SESSION(login: LoginConfig, default: str = 'tgcf_bot'):
         login: LoginConfig section from config
         default: Default session name for bot accounts
     """
-    if login.SESSION_STRING and login.user_type == 1:
+    if login.session_string and login.user_type == 1:
         logging.info("using session string")
-        return StringSession(login.SESSION_STRING)
-    elif login.BOT_TOKEN and login.user_type == 0:
+        return StringSession(login.session_string)
+    elif login.bot_token and login.user_type == 0:
         logging.info("using bot account")
         return default
 

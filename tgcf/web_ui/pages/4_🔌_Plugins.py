@@ -180,13 +180,13 @@ if check_password(st):
             user_type = st.radio("Account Type", ["Bot", "User"], index=CONFIG.plugins.sender.user_type,horizontal=True)
             if user_type == "Bot":
                 CONFIG.plugins.sender.user_type = 0
-                CONFIG.plugins.sender.BOT_TOKEN = st.text_input(
-                    "Bot Token", value=CONFIG.plugins.sender.BOT_TOKEN, type="password"
+                CONFIG.plugins.sender.bot_token = st.text_input(
+                    "Bot Token", value=CONFIG.plugins.sender.bot_token, type="password"
                 )
             else:
                 CONFIG.plugins.sender.user_type = 1
-                CONFIG.plugins.sender.SESSION_STRING = st.text_input(
-                    "Session String", CONFIG.plugins.sender.SESSION_STRING, type="password"
+                CONFIG.plugins.sender.session_string = st.text_input(
+                    "Session String", CONFIG.plugins.sender.session_string, type="password"
                 )
                 st.markdown(
                 """

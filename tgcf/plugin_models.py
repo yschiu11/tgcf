@@ -1,7 +1,7 @@
 from enum import Enum
 from typing import Dict, List
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field
 from watermark import Position
 
 
@@ -82,10 +82,12 @@ class Caption(BaseModel):
     footer: str = ""
 
 class Sender(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     check: bool = False
     user_type: int = 0  # 0:bot, 1:user
-    BOT_TOKEN: str = ""
-    SESSION_STRING: str = ""
+    bot_token: str = Field("", alias="BOT_TOKEN")
+    session_string: str = Field("", alias="SESSION_STRING")
 
 class PluginConfig(BaseModel):
     filter: Filters = Filters()
