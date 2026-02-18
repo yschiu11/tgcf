@@ -3,7 +3,7 @@ import sys
 
 from telethon import TelegramClient
 
-from tgcf.config import get_SESSION, read_config
+from tgcf.config import get_session, read_config
 from tgcf.plugin_models import FileType
 from tgcf.plugins import TgcfMessage, TgcfPlugin
 
@@ -19,7 +19,7 @@ class TgcfSender(TgcfPlugin):
         """
         config = read_config()
         sender = TelegramClient(
-            get_SESSION(config.login, 'tgcf_sender'),
+            get_session(config.login, 'tgcf_sender'),
             config.login.api_id,
             config.login.api_hash,
         )

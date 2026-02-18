@@ -71,7 +71,7 @@ def load_plugins(plugin_config: PluginConfig) -> dict[str, TgcfPlugin]:
     _plugins = {}
     for item in plugin_config:
         plugin_id = item[0]
-        if item[1].check == False:
+        if item[1].enabled == False:
             continue
 
         plugin_class_name = f"Tgcf{plugin_id.title()}"

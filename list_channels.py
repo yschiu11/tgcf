@@ -7,12 +7,12 @@ from pathlib import Path
 from telethon import TelegramClient
 from telethon.errors import AuthKeyError
 
-from tgcf.config import CONFIG, get_SESSION
+from tgcf.config import CONFIG, get_session
 
 
 async def list_channels() -> None:
     """List all channels and groups with their IDs, saving results to a file."""
-    SESSION = get_SESSION()
+    SESSION = get_session()
     DEFAULT_OUTPUT_FILE = Path("channels.txt")
 
     stats = {"channels": 0, "supergroups": 0, "groups": 0, "protected": 0}

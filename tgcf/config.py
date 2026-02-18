@@ -23,8 +23,8 @@ class Forward(BaseModel):
     """Blueprint for the forward object."""
 
     # pylint: disable=too-few-public-methods
-    con_name: str = ""
-    use_this: bool = True
+    config_name: str = ""
+    enabled: bool = True
     source: Union[int, str] = ""
     dest: List[Union[int, str]] = []
     offset: int = 0
@@ -166,7 +166,7 @@ async def get_id(client: TelegramClient, peer):
         raise
 
 
-async def load_from_to(
+async def resolve_forward_rules(
     client: TelegramClient, forwards: List[Forward]
 ) -> Dict[int, tuple[Forward, list[int]]]:
     """Convert Forward objects to a mapping with resolved IDs.
@@ -189,7 +189,7 @@ async def load_from_to(
         return await get_id(client, peer)
 
     for forward in forwards:
-        if not forward.use_this:
+        if not forward.enabled:
             continue
         source = forward.source
         if not isinstance(source, int) and source.strip() == "":
@@ -208,7 +208,7 @@ async def load_admins(client: TelegramClient, admins: list[int | str]) -> list[i
     return resolved
 
 
-def get_SESSION(login: LoginConfig, default: str = 'tgcf_bot'):
+def get_session(login: LoginConfig, default: str = 'tgcf_bot'):
     """Get session for Telegram client.
     
     Args:

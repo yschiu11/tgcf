@@ -8,7 +8,7 @@ import logging
 
 from telethon import TelegramClient
 
-from tgcf.config import ensure_config_exists, get_SESSION, read_config
+from tgcf.config import ensure_config_exists, get_session, read_config
 from tgcf.utils.sender import forward_by_link
 
 
@@ -31,7 +31,7 @@ async def forward_link_job(url: str, destinations: list[str], config_path: str) 
             "Use a user account for full access."
         )
 
-    session = get_SESSION(config.login)
+    session = get_session(config.login)
     async with TelegramClient(
         session, config.login.API_ID, config.login.API_HASH
     ) as client:
