@@ -22,9 +22,9 @@ class ConfigurationError(Exception):
 class Forward(BaseModel):
     """Blueprint for the forward object."""
 
+    # pylint: disable=too-few-public-methods
     model_config = ConfigDict(populate_by_name=True)
 
-    # pylint: disable=too-few-public-methods
     config_name: str = Field("", alias="con_name")
     enabled: bool = Field(True, alias="use_this")
     source: Union[int, str] = ""

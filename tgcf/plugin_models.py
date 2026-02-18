@@ -48,6 +48,7 @@ STYLE_CODES = {"bold": "**", "italics": "__", "code": "`", "strike": "~~", "plai
 
 class Filters(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
     enabled: bool = Field(False, alias="check")
     users: FilterList = FilterList()
     files: FilesFilterList = FilesFilterList()
@@ -56,12 +57,14 @@ class Filters(BaseModel):
 
 class Format(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
     enabled: bool = Field(False, alias="check")
     style: Style = Style.PRESERVE
 
 
 class MarkConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
     enabled: bool = Field(False, alias="check")
     image: str = "image.png"
     position: Position = Position.centre
@@ -70,11 +73,13 @@ class MarkConfig(BaseModel):
 
 class OcrConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
     enabled: bool = Field(False, alias="check")
 
 
 class Replace(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
     enabled: bool = Field(False, alias="check")
     text: Dict[str, str] = {}
     text_raw: str = ""
@@ -83,6 +88,7 @@ class Replace(BaseModel):
 
 class Caption(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
     enabled: bool = Field(False, alias="check")
     header: str = ""
     footer: str = ""
@@ -97,6 +103,7 @@ class Sender(BaseModel):
 
 class PluginConfig(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
+
     filter: Filters = Filters()
     format: Format = Field(Format(), alias="fmt")
     mark: MarkConfig = MarkConfig()
