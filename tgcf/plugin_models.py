@@ -91,7 +91,7 @@ class Sender(BaseModel):
 
 class PluginConfig(BaseModel):
     filter: Filters = Filters()
-    fmt: Format = Format()
+    format: Format = Format()
     mark: MarkConfig = MarkConfig()
     ocr: OcrConfig = OcrConfig()
     replace: Replace = Replace()

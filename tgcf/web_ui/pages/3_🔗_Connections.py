@@ -78,6 +78,7 @@ if check_password(st):
                         "Source",
                         value=CONFIG.forwards[i].source,
                         key=f"source {con}",
+                        placeholder="@username, t.me/xxx, or -1001234567890",
                     ).strip()
                     st.write("only one source is allowed in a connection")
                     CONFIG.forwards[i].dest = get_list(

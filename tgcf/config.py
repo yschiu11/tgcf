@@ -185,7 +185,7 @@ async def resolve_forward_rules(
     """
     from_to_dict: Dict[int, tuple[Forward, list[int]]] = {}
 
-    async def _(peer):
+    async def resolve_id(peer):
         return await get_id(client, peer)
 
     for forward in forwards:
@@ -194,8 +194,8 @@ async def resolve_forward_rules(
         source = forward.source
         if not isinstance(source, int) and source.strip() == "":
             continue
-        src = await _(forward.source)
-        dests = [await _(dest) for dest in forward.dest]
+        src = await resolve_id(forward.source)
+        dests = [await resolve_id(dest) for dest in forward.dest]
         from_to_dict[src] = (forward, dests)
     logging.info(f"Loaded {len(from_to_dict)} active forwards")
     return from_to_dict

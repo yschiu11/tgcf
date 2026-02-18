@@ -93,7 +93,7 @@ async def _run_past_mode(ctx: TgcfContext, session: str | StringSession) -> None
         sys.exit(1)
 
     async with TelegramClient(
-        session, ctx.config.login.API_ID, ctx.config.login.API_HASH
+        session, ctx.config.login.api_id, ctx.config.login.api_hash
     ) as client:
         ctx.bind_client(client)
         ctx.from_to = await resolve_forward_rules(client, ctx.config.forwards)
@@ -112,17 +112,17 @@ async def _run_live_mode(ctx: TgcfContext, session: str | StringSession) -> None
     """
     client = TelegramClient(
         session,
-        ctx.config.login.API_ID,
-        ctx.config.login.API_HASH,
+        ctx.config.login.api_id,
+        ctx.config.login.api_hash,
         sequential_updates=ctx.config.live.sequential_updates,
     )
     ctx.bind_client(client)
 
     if ctx.config.login.user_type == 0:
-        if not ctx.config.login.BOT_TOKEN:
+        if not ctx.config.login.bot_token:
             logging.critical("Bot token not found, but login type is set to bot.")
             sys.exit(1)
-        await ctx.client.start(bot_token=ctx.config.login.BOT_TOKEN)
+        await ctx.client.start(bot_token=ctx.config.login.bot_token)
     else:
         await ctx.client.start()
 

@@ -33,7 +33,7 @@ async def forward_link_job(url: str, destinations: list[str], config_path: str) 
 
     session = get_session(config.login)
     async with TelegramClient(
-        session, config.login.API_ID, config.login.API_HASH
+        session, config.login.api_id, config.login.api_hash
     ) as client:
         logging.info(f"Sending message from {url} to {destinations}")
 

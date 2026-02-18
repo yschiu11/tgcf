@@ -78,15 +78,15 @@ if check_password(st):
             )
 
     with st.expander("Format"):
-        CONFIG.plugins.fmt.enabled = st.checkbox(
-            "Use this plugin: format", value=CONFIG.plugins.fmt.enabled
+        CONFIG.plugins.format.enabled = st.checkbox(
+            "Use this plugin: format", value=CONFIG.plugins.format.enabled
         )
         st.write(
             "Add style to text like **bold**, _italics_, ~~strikethrough~~, `monospace` etc."
         )
         style_list = [item.value for item in Style]
-        CONFIG.plugins.fmt.style = st.selectbox(
-            "Format", style_list, index=style_list.index(CONFIG.plugins.fmt.style)
+        CONFIG.plugins.format.style = st.selectbox(
+            "Format", style_list, index=style_list.index(CONFIG.plugins.format.style)
         )
 
     with st.expander("Watermark"):
