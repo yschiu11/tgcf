@@ -19,7 +19,7 @@ async def list_channels() -> None:
 
     try:
         async with TelegramClient(
-            SESSION, CONFIG.login.API_ID, CONFIG.login.API_HASH
+            SESSION, CONFIG.login.api_id, CONFIG.login.api_hash
         ) as client:
             separator = "=" * 60
             header = f"{separator}\nCHANNELS & GROUPS YOU'VE JOINED\n{separator}\n\n"
