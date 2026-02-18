@@ -7,19 +7,20 @@ from pathlib import Path
 from telethon import TelegramClient
 from telethon.errors import AuthKeyError
 
-from tgcf.config import CONFIG, get_session
+from tgcf.config import get_session, read_config
 
 
 async def list_channels() -> None:
     """List all channels and groups with their IDs, saving results to a file."""
-    SESSION = get_session()
+    config = read_config()
+    session = get_session(config.login)
     DEFAULT_OUTPUT_FILE = Path("channels.txt")
 
     stats = {"channels": 0, "supergroups": 0, "groups": 0, "protected": 0}
 
     try:
         async with TelegramClient(
-            SESSION, CONFIG.login.api_id, CONFIG.login.api_hash
+            session, config.login.api_id, config.login.api_hash
         ) as client:
             separator = "=" * 60
             header = f"{separator}\nCHANNELS & GROUPS YOU'VE JOINED\n{separator}\n\n"

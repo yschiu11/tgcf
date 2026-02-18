@@ -24,9 +24,9 @@ class TgcfSender(TgcfPlugin):
             config.login.api_hash,
         )
         if config.login.user_type == 0:
-            if config.login.bot_token == "":
+            if not config.login.bot_token:
                 logging.warning("[Sender] Bot token not found, but login type is set to bot.")
-                sys.exit()
+                sys.exit(1)
             await sender.start(bot_token=config.login.bot_token)
         else:
             await sender.start()
