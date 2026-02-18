@@ -52,7 +52,6 @@ def configure_logging(value: bool | None):
     traceback.install()
     if value:
         level = logging.INFO
-        logging.info("Verbosity turned on! This is suitable for debugging")
     else:
         level = logging.WARNING
     logging.basicConfig(
@@ -64,7 +63,10 @@ def configure_logging(value: bool | None):
                 markup=True,
             )
         ],
+        force=True
     )
+    if value:
+        logging.info("Verbosity turned on! This is suitable for debugging")
 
 
 def version_callback(value: bool | None):
