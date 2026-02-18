@@ -47,51 +47,58 @@ STYLE_CODES = {"bold": "**", "italics": "__", "code": "`", "strike": "~~", "plai
 
 
 class Filters(BaseModel):
-    enabled: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+    enabled: bool = Field(False, alias="check")
     users: FilterList = FilterList()
     files: FilesFilterList = FilesFilterList()
     text: TextFilter = TextFilter()
 
 
 class Format(BaseModel):
-    enabled: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+    enabled: bool = Field(False, alias="check")
     style: Style = Style.PRESERVE
 
 
 class MarkConfig(BaseModel):
-    enabled: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+    enabled: bool = Field(False, alias="check")
     image: str = "image.png"
     position: Position = Position.centre
     frame_rate: int = 15
 
 
 class OcrConfig(BaseModel):
-    enabled: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+    enabled: bool = Field(False, alias="check")
 
 
 class Replace(BaseModel):
-    enabled: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+    enabled: bool = Field(False, alias="check")
     text: Dict[str, str] = {}
     text_raw: str = ""
     regex: bool = False
 
 
 class Caption(BaseModel):
-    enabled: bool = False
+    model_config = ConfigDict(populate_by_name=True)
+    enabled: bool = Field(False, alias="check")
     header: str = ""
     footer: str = ""
 
 class Sender(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    enabled: bool = False
+    enabled: bool = Field(False, alias="check")
     user_type: int = 0  # 0:bot, 1:user
     bot_token: str = Field("", alias="BOT_TOKEN")
     session_string: str = Field("", alias="SESSION_STRING")
 
 class PluginConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
     filter: Filters = Filters()
-    format: Format = Format()
+    format: Format = Field(Format(), alias="fmt")
     mark: MarkConfig = MarkConfig()
     ocr: OcrConfig = OcrConfig()
     replace: Replace = Replace()
