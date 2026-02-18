@@ -6,10 +6,10 @@ import yaml
 from telethon import events
 
 from tgcf.bot.utils import (
-    make_admin_protect,
     display_forwards,
     get_args,
     get_command_prefix,
+    make_admin_protect,
     remove_source,
 )
 from tgcf.config import Forward, load_from_to

@@ -2,9 +2,8 @@
 
 import logging
 import os
-import sys
-from typing import Dict, List, Optional, Union, Any
 import tempfile
+from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient

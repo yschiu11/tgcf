@@ -8,9 +8,9 @@ import streamlit as st
 from tgcf.web_ui.password import check_password
 from tgcf.web_ui.utils import (
     hide_st,
-    switch_theme,
     load_config_to_session,
-    save_session_config
+    save_session_config,
+    switch_theme,
 )
 
 CONFIG = load_config_to_session()

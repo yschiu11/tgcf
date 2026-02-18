@@ -1,10 +1,12 @@
 """List all channels/groups the user has joined and save to file."""
 
-import logging
-from telethon.errors import AuthKeyError
 import asyncio
+import logging
 from pathlib import Path
+
 from telethon import TelegramClient
+from telethon.errors import AuthKeyError
+
 from tgcf.config import CONFIG, get_SESSION
 
 

@@ -2,7 +2,7 @@ import os
 from importlib import resources
 
 import tgcf.web_ui as wu
-from tgcf.config import read_config, CONFIG_FILE_NAME
+from tgcf.config import CONFIG_FILE_NAME, read_config
 from tgcf.const import CONFIG_ENV_VAR_NAME
 
 package_dir = resources.files(wu)

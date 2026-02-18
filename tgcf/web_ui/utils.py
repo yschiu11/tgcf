@@ -1,10 +1,13 @@
 import os
-import streamlit as st
 from typing import Dict, List
-from tgcf.web_ui.run import package_dir
+
+import streamlit as st
 from streamlit.components.v1 import html
-from tgcf.config import read_config, write_config, Config
-from tgcf.const import CONFIG_FILE_NAME, CONFIG_ENV_VAR_NAME
+
+from tgcf.config import Config, read_config, write_config
+from tgcf.const import CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME
+from tgcf.web_ui.run import package_dir
+
 
 def get_config_path() -> str:
     return os.getenv(CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME)

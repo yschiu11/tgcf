@@ -8,7 +8,7 @@ import logging
 
 from telethon import TelegramClient
 
-from tgcf.config import read_config, ensure_config_exists, get_SESSION
+from tgcf.config import ensure_config_exists, get_SESSION, read_config
 from tgcf.utils.sender import forward_by_link
 
 

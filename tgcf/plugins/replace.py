@@ -1,9 +1,5 @@
 import logging
-from typing import Any, Dict
 
-from pydantic import BaseModel  # pylint: disable=no-name-in-module
-
-from tgcf.plugin_models import Replace
 from tgcf.plugins import TgcfMessage, TgcfPlugin
 from tgcf.utils.text import replace
 

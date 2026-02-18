@@ -2,6 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 
 from telethon import TelegramClient
+
 from tgcf.config import Config, Forward, write_config
 from tgcf.pipeline import ForwardingPipeline, MessageHistory
 

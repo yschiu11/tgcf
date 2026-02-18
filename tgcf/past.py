@@ -7,11 +7,11 @@
 import asyncio
 import logging
 
-from telethon import TelegramClient
 from telethon.errors.rpcerrorlist import FloodWaitError
 
 from tgcf.context import TgcfContext
 from tgcf.pipeline import MessagePacket
+
 
 async def forward_job(ctx: TgcfContext) -> None:
     """
