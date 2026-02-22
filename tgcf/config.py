@@ -178,7 +178,7 @@ async def resolve_forward_rules(
         forwards: List of Forward objects
 
     Returns:
-        Dict mapping source chat ID -> (original Forward, resolved dest_chats)
+        Dict mapping src_chat -> (original Forward, resolved dest_chats)
 
     Notes:
     -> The Forward objects may contain username/phn no/links
@@ -193,12 +193,12 @@ async def resolve_forward_rules(
     for forward in forwards:
         if not forward.enabled:
             continue
-        source = forward.source
-        if not isinstance(source, int) and source.strip() == "":
+        raw_src = forward.source
+        if not isinstance(raw_src, int) and raw_src.strip() == "":
             continue
-        src = await resolve_id(forward.source)
+        src_chat = await resolve_id(raw_src)
         dest_chats = [await resolve_id(raw_dest) for raw_dest in forward.dest]
-        from_to_dict[src] = (forward, dest_chats)
+        from_to_dict[src_chat] = (forward, dest_chats)
     logging.info(f"Loaded {len(from_to_dict)} active forwards")
     return from_to_dict
 

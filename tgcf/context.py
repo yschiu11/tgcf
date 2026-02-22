@@ -19,7 +19,7 @@ class TgcfContext:
     is_bot: bool | None = None
 
     # Resolved mappings, compute once after client connects
-    # Map source chat ID -> (Forward object, resolved dest_chats)
+    # Map src_chat -> (Forward object, resolved dest_chats)
     from_to: dict[int, tuple[Forward, list[int]]] = field(default_factory=dict)
     admins: list[int] = field(default_factory=list)
 

@@ -15,23 +15,23 @@ class MessageHistory:
     def __init__(self):
         self.records: dict[tuple[int, int], dict[int, int | None]] = {}
 
-    def add_placeholder(self, source_chat: int, source_msg: int, dest_chats: list[int]):
-        uid = (source_chat, source_msg)
+    def add_placeholder(self, src_chat: int, src_msg: int, dest_chats: list[int]):
+        uid = (src_chat, src_msg)
         if uid not in self.records:
             self.records[uid] = {}
 
         for dest_chat in dest_chats:
             self.records[uid][dest_chat] = None
 
-    def set_sent_id(self, source_chat: int, source_msg: int, dest_chat: int, dest_msg: int):
-        uid = (source_chat, source_msg)
+    def set_sent_id(self, src_chat: int, src_msg: int, dest_chat: int, dest_msg: int):
+        uid = (src_chat, src_msg)
         if uid not in self.records:
             self.records[uid] = {}
 
         self.records[uid][dest_chat] = dest_msg
 
-    def get_dest_msg(self, source_chat_id: int, source_msg: int, dest_chat: int) -> int | None:
-        uid = (source_chat_id, source_msg)
+    def get_dest_msg(self, src_chat: int, src_msg: int, dest_chat: int) -> int | None:
+        uid = (src_chat, src_msg)
         return self.records.get(uid, {}).get(dest_chat)
 
     def prune(self, limit: int):
@@ -41,7 +41,7 @@ class MessageHistory:
 @dataclass
 class MessagePacket:
     raw_message: Message
-    source_chat_id: int
+    src_chat: int
     dest_chats: list[int]
 
 class PipelineStatus(Enum):
@@ -63,15 +63,15 @@ class ForwardingPipeline:
         self.client = client
         self.config = config
         self.history = history
-        # map: chat_id -> (Buffer, DestChats)
+        # map: src_chat -> (Buffer, DestChats)
         self.buffers: dict[int, tuple[AlbumBuffer, list[int]]] = {}
 
-    def is_safe_to_checkpoint(self, chat_id: int) -> bool:
-        return chat_id not in self.buffers
+    def is_safe_to_checkpoint(self, src_chat: int) -> bool:
+        return src_chat not in self.buffers
 
     async def handle_message(self, packet: MessagePacket) -> PipelineResult:
         msg = packet.raw_message
-        chat_id = packet.source_chat_id
+        src_chat = packet.src_chat
         did_flush = False
 
         if isinstance(msg, MessageService):
@@ -83,21 +83,21 @@ class ForwardingPipeline:
         if not tm:
             return PipelineResult(PipelineStatus.IGNORED)
 
-        if chat_id in self.buffers:
-            buffer, _ = self.buffers[chat_id]
+        if src_chat in self.buffers:
+            buffer, _ = self.buffers[src_chat]
             if buffer.should_flush(msg.grouped_id):
-                await self._flush_buffer(chat_id)
+                await self._flush_buffer(src_chat)
                 did_flush = True
 
         if msg.grouped_id:
-            if chat_id not in self.buffers:
-                self.buffers[chat_id] = (AlbumBuffer(), packet.dest_chats)
+            if src_chat not in self.buffers:
+                self.buffers[src_chat] = (AlbumBuffer(), packet.dest_chats)
 
-            buffer, _ = self.buffers[chat_id]
+            buffer, _ = self.buffers[src_chat]
             buffer.add_message(tm)
             self.history.add_placeholder(
-                source_chat=chat_id,
-                source_msg=msg.id,
+                src_chat=src_chat,
+                src_msg=msg.id,
                 dest_chats=packet.dest_chats
             )
 
@@ -107,18 +107,18 @@ class ForwardingPipeline:
             tm.clear()
             return PipelineResult(PipelineStatus.SENT, packet.dest_chats, did_flush)
 
-    async def flush(self, chat_id: int) -> None:
+    async def flush(self, src_chat: int) -> None:
         """Public method for the external timeout task to call."""
-        await self._flush_buffer(chat_id)
+        await self._flush_buffer(src_chat)
 
 
-    async def _flush_buffer(self, chat_id: int) -> None:
-        if chat_id not in self.buffers:
+    async def _flush_buffer(self, src_chat: int) -> None:
+        if src_chat not in self.buffers:
             return
 
-        buffer, dest_chats = self.buffers[chat_id]
+        buffer, dest_chats = self.buffers[src_chat]
         messages = buffer.flush()
-        del self.buffers[chat_id]
+        del self.buffers[src_chat]
 
         if not messages:
             return
@@ -134,13 +134,13 @@ class ForwardingPipeline:
 
     async def handle_edit(self, packet: MessagePacket) -> PipelineResult:
         msg = packet.raw_message
-        source_chat_id = packet.source_chat_id
+        src_chat = packet.src_chat
 
         tm = await apply_plugins(msg, self.config.plugins)
         if not tm:
             return PipelineResult(PipelineStatus.IGNORED)
 
-        event_uid = (source_chat_id, msg.id)
+        event_uid = (src_chat, msg.id)
         dest_map = self.history.records.get(event_uid)
 
         if dest_map:
@@ -160,9 +160,9 @@ class ForwardingPipeline:
         tm.clear()
         return PipelineResult(PipelineStatus.SENT)
 
-    async def handle_delete(self, chat_id: int, deleted_ids: list[int]) -> PipelineResult:
+    async def handle_delete(self, src_chat: int, deleted_ids: list[int]) -> PipelineResult:
         for msg_id in deleted_ids:
-            event_uid = (chat_id, msg_id)
+            event_uid = (src_chat, msg_id)
             dest_map = self.history.records.get(event_uid)
             if dest_map:
                 for dest_chat, dest_msg in dest_map.items():

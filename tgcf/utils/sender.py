@@ -15,7 +15,7 @@ from tgcf.plugins import TgcfMessage
 from tgcf.utils.buffer import fetch_album_by_message
 from tgcf.utils.text import parse_telegram_link
 
-# Maps (source_chat_id, source_msg_id) -> {dest_chat: dest_msg}
+# Maps (src_chat, src_msg) -> {dest_chat: dest_msg}
 ForwardMap = dict[tuple[int, int], dict[int, int | None]]
 
 
@@ -81,7 +81,7 @@ async def send_album(
 
 
 def get_reply_to_mapping(
-    source_chat_id: int,
+    src_chat: int,
     reply_to_msg_id: int,
     config: Config,
     stored: ForwardMap,
@@ -92,7 +92,7 @@ def get_reply_to_mapping(
     message ID that the reply should point to.
 
     Args:
-        source_chat_id: Chat where the original message lives.
+        src_chat: Chat where the original message lives.
         reply_to_msg_id: ID the original message replies to.
         config: Global configuration (checked for ``reply_chain``).
         stored: Forward map with previously sent IDs.
@@ -104,7 +104,7 @@ def get_reply_to_mapping(
     if not config.reply_chain:
         return {}
 
-    reply_event_uid = (source_chat_id, reply_to_msg_id)
+    reply_event_uid = (src_chat, reply_to_msg_id)
 
     if reply_event_uid in stored:
         return stored[reply_event_uid]
@@ -134,7 +134,7 @@ async def forward_album_anonymous(
     if not messages:
         return
 
-    source_chat_id = messages[0].message.chat_id
+    src_chat = messages[0].message.chat_id
     first_message = messages[0].message
 
     files_to_send = []
@@ -156,7 +156,7 @@ async def forward_album_anonymous(
     reply_to_mapping: dict[int, int | None] = {}
     if first_message.is_reply:
         reply_to_mapping = get_reply_to_mapping(
-            source_chat_id, first_message.reply_to_msg_id, config, stored
+            src_chat, first_message.reply_to_msg_id, config, stored
         )
 
     for dest_chat in dest_chats:
@@ -180,7 +180,7 @@ async def forward_album_anonymous(
                 )
             # Update storage for each sent message
             for tm, dest_obj in zip(messages, dest_objs):
-                event_uid = (source_chat_id, tm.message.id)
+                event_uid = (src_chat, tm.message.id)
                 if event_uid not in stored:
                     stored[event_uid] = {}
                 stored[event_uid][dest_chat] = dest_obj.id
@@ -207,12 +207,12 @@ async def forward_album(
     if not messages:
         return
 
-    source_chat_id = messages[0].message.chat_id
+    src_chat = messages[0].message.chat_id
     message_ids = [tm.message.id for tm in messages]
 
     for dest_chat in dest_chats:
         try:
-            dest_objs = await client.forward_messages(dest_chat, message_ids, source_chat_id)
+            dest_objs = await client.forward_messages(dest_chat, message_ids, src_chat)
 
             if not isinstance(dest_objs, list):
                 dest_objs = [dest_objs]
@@ -224,7 +224,7 @@ async def forward_album(
                 )
             # Update storage for each message in the album
             for tm, dest_obj in zip(messages, dest_objs):
-                event_uid = (source_chat_id, tm.message.id)
+                event_uid = (src_chat, tm.message.id)
                 if event_uid not in stored:
                     stored[event_uid] = {}
                 stored[event_uid][dest_chat] = dest_obj.id
