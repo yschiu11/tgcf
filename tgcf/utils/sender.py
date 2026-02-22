@@ -104,10 +104,10 @@ def get_reply_to_mapping(
     if not config.reply_chain:
         return {}
 
-    reply_event_uid = (src_chat, reply_to_msg_id)
+    reply_src_uid = (src_chat, reply_to_msg_id)
 
-    if reply_event_uid in stored:
-        return stored[reply_event_uid]
+    if reply_src_uid in stored:
+        return stored[reply_src_uid]
 
     return {}
 
@@ -180,10 +180,10 @@ async def forward_album_anonymous(
                 )
             # Update storage for each sent message
             for tm, dest_obj in zip(messages, dest_objs):
-                event_uid = (src_chat, tm.message.id)
-                if event_uid not in stored:
-                    stored[event_uid] = {}
-                stored[event_uid][dest_chat] = dest_obj.id
+                src_uid = (src_chat, tm.message.id)
+                if src_uid not in stored:
+                    stored[src_uid] = {}
+                stored[src_uid][dest_chat] = dest_obj.id
 
         except Exception as err:
             logging.error(f"Failed to send album to {dest_chat}: {err}")
@@ -224,10 +224,10 @@ async def forward_album(
                 )
             # Update storage for each message in the album
             for tm, dest_obj in zip(messages, dest_objs):
-                event_uid = (src_chat, tm.message.id)
-                if event_uid not in stored:
-                    stored[event_uid] = {}
-                stored[event_uid][dest_chat] = dest_obj.id
+                src_uid = (src_chat, tm.message.id)
+                if src_uid not in stored:
+                    stored[src_uid] = {}
+                stored[src_uid][dest_chat] = dest_obj.id
 
         except Exception as err:
             logging.warning(
@@ -254,9 +254,11 @@ async def forward_single_message(
         config: Global forwarding configuration.
         stored: Forward map updated with sent message IDs.
     """
-    event_uid = (tm.message.chat_id, tm.message.id)
-    if event_uid not in stored:
-        stored[event_uid] = {}
+    # If the message handles replies, look up the forwarded reply-to ID
+    reply_to = None
+    src_uid = (tm.message.chat_id, tm.message.id)
+    if src_uid not in stored:
+        stored[src_uid] = {}
 
     reply_to_mapping: dict[int, int | None] = {}
     if tm.message.is_reply:
@@ -268,7 +270,7 @@ async def forward_single_message(
         try:
             tm.reply_to = reply_to_mapping.get(dest_chat)
             dest_obj = await send_message(dest_chat, tm, config)
-            stored[event_uid][dest_chat] = dest_obj.id
+            stored[src_uid][dest_chat] = dest_obj.id
         except Exception as err:
             logging.error(f"Failed to forward message {tm.message.id} to {dest_chat}: {err}")
 

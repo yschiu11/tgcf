@@ -16,23 +16,23 @@ class MessageHistory:
         self.records: dict[tuple[int, int], dict[int, int | None]] = {}
 
     def add_placeholder(self, src_chat: int, src_msg: int, dest_chats: list[int]):
-        uid = (src_chat, src_msg)
-        if uid not in self.records:
-            self.records[uid] = {}
+        src_uid = (src_chat, src_msg)
+        if src_uid not in self.records:
+            self.records[src_uid] = {}
 
         for dest_chat in dest_chats:
-            self.records[uid][dest_chat] = None
+            self.records[src_uid][dest_chat] = None
 
     def set_sent_id(self, src_chat: int, src_msg: int, dest_chat: int, dest_msg: int):
-        uid = (src_chat, src_msg)
-        if uid not in self.records:
-            self.records[uid] = {}
+        src_uid = (src_chat, src_msg)
+        if src_uid not in self.records:
+            self.records[src_uid] = {}
 
-        self.records[uid][dest_chat] = dest_msg
+        self.records[src_uid][dest_chat] = dest_msg
 
     def get_dest_msg(self, src_chat: int, src_msg: int, dest_chat: int) -> int | None:
-        uid = (src_chat, src_msg)
-        return self.records.get(uid, {}).get(dest_chat)
+        src_uid = (src_chat, src_msg)
+        return self.records.get(src_uid, {}).get(dest_chat)
 
     def prune(self, limit: int):
         while len(self.records) > limit:
@@ -140,8 +140,8 @@ class ForwardingPipeline:
         if not tm:
             return PipelineResult(PipelineStatus.IGNORED)
 
-        event_uid = (src_chat, msg.id)
-        dest_map = self.history.records.get(event_uid)
+        src_uid = (src_chat, msg.id)
+        dest_map = self.history.records.get(src_uid)
 
         if dest_map:
             for dest_chat, dest_msg in dest_map.items():
@@ -162,8 +162,8 @@ class ForwardingPipeline:
 
     async def handle_delete(self, src_chat: int, deleted_ids: list[int]) -> PipelineResult:
         for msg_id in deleted_ids:
-            event_uid = (src_chat, msg_id)
-            dest_map = self.history.records.get(event_uid)
+            src_uid = (src_chat, msg_id)
+            dest_map = self.history.records.get(src_uid)
             if dest_map:
                 for dest_chat, dest_msg in dest_map.items():
                     if dest_msg is None:
