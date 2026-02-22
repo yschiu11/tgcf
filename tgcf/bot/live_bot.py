@@ -22,7 +22,7 @@ def make_forward_command_handler(ctx: TgcfContext):
     admin_protect = make_admin_protect(ctx)
 
     @admin_protect
-    async def handler(event):
+    async def handler(cmd_event):
         """Handle the `/forward` command."""
         notes = """The `/forward` command allows you to add a new forward.
         Example: suppose you want to forward from a to (b and c)
@@ -39,7 +39,7 @@ def make_forward_command_handler(ctx: TgcfContext):
         )
 
         try:
-            args = get_args(event.message.text)
+            args = get_args(cmd_event.message.text)
             if not args:
                 raise ValueError(f"{notes}\n{display_forwards(ctx.config.forwards)}")
 
@@ -52,11 +52,11 @@ def make_forward_command_handler(ctx: TgcfContext):
             ctx.config.forwards.append(forward)
             ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
-            await event.respond("Success")
+            await cmd_event.respond("Success")
             ctx.save_config()
         except ValueError as err:
             logging.error(err)
-            await event.respond(str(err))
+            await cmd_event.respond(str(err))
 
         finally:
             raise events.StopPropagation
@@ -69,7 +69,7 @@ def make_remove_command_handler(ctx: TgcfContext):
     admin_protect = make_admin_protect(ctx)
 
     @admin_protect
-    async def handler(event):
+    async def handler(cmd_event):
         """Handle the /remove command."""
         notes = """The `/remove` command allows you to remove a source from forwarding.
         Example: Suppose you want to remove the channel with id -100, then run
@@ -81,7 +81,7 @@ def make_remove_command_handler(ctx: TgcfContext):
         )
 
         try:
-            args = get_args(event.message.text)
+            args = get_args(cmd_event.message.text)
             if not args:
                 raise ValueError(f"{notes}\n{display_forwards(ctx.config.forwards)}")
 
@@ -90,11 +90,11 @@ def make_remove_command_handler(ctx: TgcfContext):
             ctx.config.forwards = remove_source(source_to_remove, ctx.config.forwards)
             ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
-            await event.respond("Success")
+            await cmd_event.respond("Success")
             ctx.save_config()
         except ValueError as err:
             logging.error(err)
-            await event.respond(str(err))
+            await cmd_event.respond(str(err))
 
         finally:
             raise events.StopPropagation
@@ -107,7 +107,7 @@ def make_style_command_handler(ctx: TgcfContext):
     admin_protect = make_admin_protect(ctx)
 
     @admin_protect
-    async def handler(event):
+    async def handler(cmd_event):
         """Handle the /style command"""
         notes = """This command is used to set the style of the messages to be forwarded.
 
@@ -120,18 +120,18 @@ def make_style_command_handler(ctx: TgcfContext):
         )
 
         try:
-            args = get_args(event.message.text)
+            args = get_args(cmd_event.message.text)
             if not args:
                 raise ValueError(f"{notes}\n")
             _valid = [item.value for item in Style]
             if args not in _valid:
                 raise ValueError(f"Invalid style. Choose from {_valid}")
             ctx.config.plugins.fmt.style = args
-            await event.respond("Success")
+            await cmd_event.respond("Success")
             ctx.save_config()
         except ValueError as err:
             logging.error(err)
-            await event.respond(str(err))
+            await cmd_event.respond(str(err))
 
         finally:
             raise events.StopPropagation
@@ -142,9 +142,9 @@ def make_style_command_handler(ctx: TgcfContext):
 def make_start_command_handler(ctx: TgcfContext):
     """Factory to create start command handler with context closure."""
 
-    async def handler(event):
+    async def handler(cmd_event):
         """Handle the /start command."""
-        await event.respond(ctx.config.bot_messages.start)
+        await cmd_event.respond(ctx.config.bot_messages.start)
 
     return handler
 
@@ -152,9 +152,9 @@ def make_start_command_handler(ctx: TgcfContext):
 def make_help_command_handler(ctx: TgcfContext):
     """Factory to create help command handler with context closure."""
 
-    async def handler(event):
+    async def handler(cmd_event):
         """Handle the /help command."""
-        await event.respond(ctx.config.bot_messages.bot_help)
+        await cmd_event.respond(ctx.config.bot_messages.bot_help)
 
     return handler
 

@@ -13,13 +13,13 @@ def make_admin_protect(ctx):
     def admin_protect(org_func):
         """Decorate to restrict non admins from accessing the bot."""
 
-        async def wrapper_func(event):
+        async def wrapper_func(cmd_event):
             """Wrap the original function."""
             logging.info(f"Applying admin protection! Admins are {ctx.admins}")
-            if event.sender_id not in ctx.admins:
-                await event.respond("You are not authorized.")
+            if cmd_event.sender_id not in ctx.admins:
+                await cmd_event.respond("You are not authorized.")
                 raise events.StopPropagation
-            return await org_func(event)
+            return await org_func(cmd_event)
 
         return wrapper_func
 

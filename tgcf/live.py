@@ -38,9 +38,9 @@ async def _schedule_album_flush(ctx: TgcfContext, src_chat: int) -> None:
 def make_new_message_handler(ctx: TgcfContext):
     """Factory that creates a new message handler with context closure."""
 
-    async def handler(event: Message | events.NewMessage) -> None:
+    async def handler(new_msg_event: Message | events.NewMessage) -> None:
         """Process new incoming messages with album buffering support."""
-        src_chat = event.chat_id
+        src_chat = new_msg_event.chat_id
 
         if src_chat not in ctx.from_to:
             return
@@ -49,7 +49,7 @@ def make_new_message_handler(ctx: TgcfContext):
         _, dest_chats = ctx.from_to[src_chat]
 
         packet = MessagePacket(
-            raw_message=event.message,
+            raw_message=new_msg_event.message,
             src_chat=src_chat,
             dest_chats=dest_chats
         )
@@ -69,9 +69,9 @@ def make_new_message_handler(ctx: TgcfContext):
 def make_edited_message_handler(ctx: TgcfContext):
     """Factory that creates an edited message handler with context closure."""
 
-    async def handler(event) -> None:
+    async def handler(edit_msg_event) -> None:
         """Handle message edits."""
-        src_chat = event.chat_id
+        src_chat = edit_msg_event.chat_id
 
         if src_chat not in ctx.from_to:
             return
@@ -80,7 +80,7 @@ def make_edited_message_handler(ctx: TgcfContext):
         _, dest_chats = ctx.from_to[src_chat]
 
         packet = MessagePacket(
-            raw_message=event.message,
+            raw_message=edit_msg_event.message,
             src_chat=src_chat,
             dest_chats=dest_chats
         )
@@ -93,24 +93,24 @@ def make_edited_message_handler(ctx: TgcfContext):
 def make_deleted_message_handler(ctx: TgcfContext):
     """Factory that creates a deleted message handler with context closure."""
 
-    async def handler(event) -> None:
+    async def handler(del_msg_event) -> None:
         """Handle message deletes."""
-        src_chat = event.chat_id
+        src_chat = del_msg_event.chat_id
         if src_chat not in ctx.from_to:
             return
 
         logging.info(f"Message deleted in {src_chat}")
 
         # Telethon's MessageDeleted can have .deleted_ids (list) or .deleted_id (int)
-        ids = getattr(event, "deleted_ids", None) or [getattr(event, "deleted_id", None)]
+        deleted_ids = getattr(del_msg_event, "deleted_ids", None) or [getattr(del_msg_event, "deleted_id", None)]
 
         # Filter for valid integers only
-        ids = [i for i in ids if isinstance(i, int)]
+        deleted_msgs = [i for i in deleted_ids if isinstance(i, int)]
 
-        if not ids:
+        if not deleted_msgs:
             return
 
-        await ctx.pipeline.handle_delete(src_chat, ids)
+        await ctx.pipeline.handle_delete(src_chat, deleted_msgs)
 
     return handler
 
