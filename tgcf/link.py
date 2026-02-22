@@ -12,14 +12,14 @@ from tgcf.config import ensure_config_exists, get_session, read_config
 from tgcf.utils.sender import forward_by_link
 
 
-async def forward_link_job(url: str, destinations: list[str], config_path: str) -> None:
+async def forward_link_job(url: str, raw_dests: list[str], config_path: str) -> None:
     """Forward a message or album by its Telegram post link.
 
     Always sends as a clean copy without 'Forwarded from' attribution.
 
     Args:
         url: Telegram post link (e.g., https://t.me/channel/123)
-        destinations: List of destination chat IDs or usernames
+        raw_dests: List of destination chat IDs or usernames
         config_path: Path to the tgcf config file
     """
     ensure_config_exists(config_path)
@@ -35,13 +35,13 @@ async def forward_link_job(url: str, destinations: list[str], config_path: str) 
     async with TelegramClient(
         session, config.login.api_id, config.login.api_hash
     ) as client:
-        logging.info(f"Sending message from {url} to {destinations}")
+        logging.info(f"Sending message from {url} to {raw_dests}")
 
         try:
             await forward_by_link(
                 client=client,
                 url=url,
-                destinations=destinations,
+                raw_dests=raw_dests,
                 config=config
             )
             logging.info("Send complete!")

@@ -20,8 +20,8 @@ class MessageHistory:
         if uid not in self.records:
             self.records[uid] = {}
 
-        for dest in dest_chats:
-            self.records[uid][dest] = None
+        for dest_chat in dest_chats:
+            self.records[uid][dest_chat] = None
 
     def set_sent_id(self, source_chat: int, source_msg: int, dest_chat: int, dest_msg: int):
         uid = (source_chat, source_msg)
@@ -42,7 +42,7 @@ class MessageHistory:
 class MessagePacket:
     raw_message: Message
     source_chat_id: int
-    dest_chat_ids: list[int]
+    dest_chats: list[int]
 
 class PipelineStatus(Enum):
     SENT = auto()
@@ -54,7 +54,7 @@ class PipelineStatus(Enum):
 @dataclass
 class PipelineResult:
     status: PipelineStatus
-    affected_destinations: list[int] = None
+    dest_chats: list[int] = None
     did_flush: bool = False  # True if an album was flushed
 
 
@@ -63,7 +63,7 @@ class ForwardingPipeline:
         self.client = client
         self.config = config
         self.history = history
-        # map: chat_id -> (Buffer, Destinations)
+        # map: chat_id -> (Buffer, DestChats)
         self.buffers: dict[int, tuple[AlbumBuffer, list[int]]] = {}
 
     def is_safe_to_checkpoint(self, chat_id: int) -> bool:
@@ -91,21 +91,21 @@ class ForwardingPipeline:
 
         if msg.grouped_id:
             if chat_id not in self.buffers:
-                self.buffers[chat_id] = (AlbumBuffer(), packet.dest_chat_ids)
+                self.buffers[chat_id] = (AlbumBuffer(), packet.dest_chats)
 
             buffer, _ = self.buffers[chat_id]
             buffer.add_message(tm)
             self.history.add_placeholder(
                 source_chat=chat_id,
                 source_msg=msg.id,
-                dest_chats=packet.dest_chat_ids
+                dest_chats=packet.dest_chats
             )
 
             return PipelineResult(PipelineStatus.BUFFERED, did_flush=did_flush)
         else:
-            await forward_single_message(tm, packet.dest_chat_ids, self.config, self.history.records)
+            await forward_single_message(tm, packet.dest_chats, self.config, self.history.records)
             tm.clear()
-            return PipelineResult(PipelineStatus.SENT, packet.dest_chat_ids, did_flush)
+            return PipelineResult(PipelineStatus.SENT, packet.dest_chats, did_flush)
 
     async def flush(self, chat_id: int) -> None:
         """Public method for the external timeout task to call."""
@@ -116,7 +116,7 @@ class ForwardingPipeline:
         if chat_id not in self.buffers:
             return
 
-        buffer, dests = self.buffers[chat_id]
+        buffer, dest_chats = self.buffers[chat_id]
         messages = buffer.flush()
         del self.buffers[chat_id]
 
@@ -125,9 +125,9 @@ class ForwardingPipeline:
 
         try:
             if len(messages) > 1:
-                await send_album(self.client, messages, dests, self.config, self.history.records)
+                await send_album(self.client, messages, dest_chats, self.config, self.history.records)
             else:
-                await forward_single_message(messages[0], dests, self.config, self.history.records)
+                await forward_single_message(messages[0], dest_chats, self.config, self.history.records)
         finally:
             for tm in messages:
                 tm.clear()
@@ -141,35 +141,35 @@ class ForwardingPipeline:
             return PipelineResult(PipelineStatus.IGNORED)
 
         event_uid = (source_chat_id, msg.id)
-        fwded_ids = self.history.records.get(event_uid)
+        dest_map = self.history.records.get(event_uid)
 
-        if fwded_ids:
-            for dest_id, dest_msg_id in fwded_ids.items():
-                if dest_msg_id is None:
+        if dest_map:
+            for dest_chat, dest_msg in dest_map.items():
+                if dest_msg is None:
                     continue
                 if self.config.live.delete_on_edit == msg.text:
-                    await self.client.delete_messages(dest_id, dest_msg_id)
+                    await self.client.delete_messages(dest_chat, dest_msg)
                 else:
                     if msg.media:
                         logging.warning("Media edits are not supported by Telegram API, only text/caption edits are synced")
-                    await self.client.edit_message(dest_id, dest_msg_id, text=tm.text)
+                    await self.client.edit_message(dest_chat, dest_msg, text=tm.text)
             tm.clear()
             return PipelineResult(PipelineStatus.SENT)
 
-        await forward_single_message(tm, packet.dest_chat_ids, self.config, self.history.records)
+        await forward_single_message(tm, packet.dest_chats, self.config, self.history.records)
         tm.clear()
         return PipelineResult(PipelineStatus.SENT)
 
     async def handle_delete(self, chat_id: int, deleted_ids: list[int]) -> PipelineResult:
         for msg_id in deleted_ids:
             event_uid = (chat_id, msg_id)
-            fwded_ids = self.history.records.get(event_uid)
-            if fwded_ids:
-                for dest_id, dest_msg_id in fwded_ids.items():
-                    if dest_msg_id is None:
+            dest_map = self.history.records.get(event_uid)
+            if dest_map:
+                for dest_chat, dest_msg in dest_map.items():
+                    if dest_msg is None:
                         continue
                     try:
-                        await self.client.delete_messages(dest_id, dest_msg_id)
+                        await self.client.delete_messages(dest_chat, dest_msg)
                     except Exception as e:
-                        logging.error(f"Failed to delete message {dest_msg_id} in {dest_id}: {e}")
+                        logging.error(f"Failed to delete message {dest_msg} in {dest_chat}: {e}")
         return PipelineResult(PipelineStatus.DELETED)

@@ -23,8 +23,8 @@ async def forward_job(ctx: TgcfContext) -> None:
     config = ctx.config
     pipeline = ctx.pipeline
 
-    for src, (forward, dests) in ctx.from_to.items():
-        logging.info(f"Forwarding messages from {src} to {dests}")
+    for src, (forward, dest_chats) in ctx.from_to.items():
+        logging.info(f"Forwarding messages from {src} to {dest_chats}")
 
         try:
             last_id = forward.offset
@@ -34,7 +34,7 @@ async def forward_job(ctx: TgcfContext) -> None:
                 if forward.end and message.id > forward.end:
                     break
 
-                packet = MessagePacket(message, src, dests)
+                packet = MessagePacket(message, src, dest_chats)
 
                 try:
                     await pipeline.handle_message(packet)
@@ -57,5 +57,5 @@ async def forward_job(ctx: TgcfContext) -> None:
             forward.offset = last_id
 
         finally:
-            logging.info(f"Completed forwarding from {src} to {dests}")
+            logging.info(f"Completed forwarding from {src} to {dest_chats}")
             ctx.save_config()

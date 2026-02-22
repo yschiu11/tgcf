@@ -46,12 +46,12 @@ def make_new_message_handler(ctx: TgcfContext):
             return
         logging.info(f"New message received in {chat_id}")
 
-        _, dest = ctx.from_to[chat_id]
+        _, dest_chats = ctx.from_to[chat_id]
 
         packet = MessagePacket(
             raw_message=event.message,
             source_chat_id=chat_id,
-            dest_chat_ids=dest
+            dest_chats=dest_chats
         )
 
         result = await ctx.pipeline.handle_message(packet)
@@ -77,12 +77,12 @@ def make_edited_message_handler(ctx: TgcfContext):
             return
 
         logging.info(f"Message edited in {chat_id}")
-        _, dest = ctx.from_to[chat_id]
+        _, dest_chats = ctx.from_to[chat_id]
 
         packet = MessagePacket(
             raw_message=event.message,
             source_chat_id=chat_id,
-            dest_chat_ids=dest
+            dest_chats=dest_chats
         )
 
         await ctx.pipeline.handle_edit(packet)

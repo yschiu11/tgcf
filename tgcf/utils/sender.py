@@ -15,12 +15,12 @@ from tgcf.plugins import TgcfMessage
 from tgcf.utils.buffer import fetch_album_by_message
 from tgcf.utils.text import parse_telegram_link
 
-# Maps (source_chat_id, source_msg_id) -> {dest_chat_id: dest_msg_id}
+# Maps (source_chat_id, source_msg_id) -> {dest_chat: dest_msg}
 ForwardMap = dict[tuple[int, int], dict[int, int | None]]
 
 
 async def send_message(
-    recipient: EntityLike,
+    dest_chat: EntityLike,
     tm: TgcfMessage,
     config: Config,
 ) -> Message:
@@ -30,7 +30,7 @@ async def send_message(
     first and falls back to an anonymous copy on failure.
 
     Args:
-        recipient: Destination chat.
+        dest_chat: Destination chat.
         tm: Wrapped message to send.
         config: Global forwarding configuration.
 
@@ -40,28 +40,28 @@ async def send_message(
     client: TelegramClient = tm.client
     if config.show_forwarded_from:
         try:
-            return await client.forward_messages(recipient, tm.message)
+            return await client.forward_messages(dest_chat, tm.message)
         except Exception as err:
             logging.warning(
-                f"Failed to forward message to {recipient}: {err}. "
+                f"Failed to forward message to {dest_chat}: {err}. "
                 "Trying anonymous send..."
             )
             # Fallback to anonymous sending
 
     # Anonymous sending (either by config or as fallback)
     if tm.new_file:
-        message = await client.send_file(
-            recipient, tm.new_file, caption=tm.text, reply_to=tm.reply_to
+        dest_obj = await client.send_file(
+            dest_chat, tm.new_file, caption=tm.text, reply_to=tm.reply_to
         )
-        return message
+        return dest_obj
     tm.message.text = tm.text
-    return await client.send_message(recipient, tm.message, reply_to=tm.reply_to)
+    return await client.send_message(dest_chat, tm.message, reply_to=tm.reply_to)
 
 
 async def send_album(
     client: TelegramClient,
     messages: list[TgcfMessage],
-    destinations: list[int],
+    dest_chats: list[int],
     config: Config,
     stored: ForwardMap,
 ) -> None:
@@ -70,14 +70,14 @@ async def send_album(
     Args:
         client: Telegram client.
         messages: Album messages.
-        destinations: Destination chat IDs.
+        dest_chats: Destination chat IDs.
         config: Global forwarding configuration.
         stored: Forward map updated with sent message IDs.
     """
     if config.show_forwarded_from:
-        await forward_album(client, messages, destinations, stored)
+        await forward_album(client, messages, dest_chats, stored)
     else:
-        await forward_album_anonymous(client, messages, destinations, config, stored)
+        await forward_album_anonymous(client, messages, dest_chats, config, stored)
 
 
 def get_reply_to_mapping(
@@ -115,7 +115,7 @@ def get_reply_to_mapping(
 async def forward_album_anonymous(
     client: TelegramClient,
     messages: list[TgcfMessage],
-    destinations: list[int],
+    dest_chats: list[int],
     config: Config,
     stored: ForwardMap,
 ) -> None:
@@ -124,7 +124,7 @@ async def forward_album_anonymous(
     Args:
         client: Telegram client.
         messages: Album messages.
-        destinations: Destination chat IDs.
+        dest_chats: Destination chat IDs.
         config: Global configuration (used for reply chaining).
         stored: Forward map updated with sent message IDs.
 
@@ -159,41 +159,41 @@ async def forward_album_anonymous(
             source_chat_id, first_message.reply_to_msg_id, config, stored
         )
 
-    for dest in destinations:
+    for dest_chat in dest_chats:
         try:
-            reply_to = reply_to_mapping.get(dest, None)
+            reply_to = reply_to_mapping.get(dest_chat, None)
 
-            sent_messages = await client.send_file(
-                dest,
+            dest_objs = await client.send_file(
+                dest_chat,
                 files_to_send,
                 caption=captions,
                 reply_to=reply_to,
             )
 
-            if not isinstance(sent_messages, list):
-                sent_messages = [sent_messages]
+            if not isinstance(dest_objs, list):
+                dest_objs = [dest_objs]
 
-            if len(sent_messages) != len(messages):
+            if len(dest_objs) != len(messages):
                 logging.error(
                     f"Album size mismatch: expected {len(messages)}, "
-                    f"got {len(sent_messages)}"
+                    f"got {len(dest_objs)}"
                 )
             # Update storage for each sent message
-            for tm, sent_msg in zip(messages, sent_messages):
+            for tm, dest_obj in zip(messages, dest_objs):
                 event_uid = (source_chat_id, tm.message.id)
                 if event_uid not in stored:
                     stored[event_uid] = {}
-                stored[event_uid][dest] = sent_msg.id
+                stored[event_uid][dest_chat] = dest_obj.id
 
         except Exception as err:
-            logging.error(f"Failed to send album to {dest}: {err}")
+            logging.error(f"Failed to send album to {dest_chat}: {err}")
             raise
 
 
 async def forward_album(
     client: TelegramClient,
     messages: list[TgcfMessage],
-    destinations: list[int],
+    dest_chats: list[int],
     stored: ForwardMap,
 ) -> None:
     """Forward an album using native Telegram forward (preserves attribution).
@@ -201,7 +201,7 @@ async def forward_album(
     Args:
         client: Telegram client.
         messages: Album messages.
-        destinations: Destination chat IDs.
+        dest_chats: Destination chat IDs.
         stored: Forward map updated with forwarded message IDs.
     """
     if not messages:
@@ -210,28 +210,28 @@ async def forward_album(
     source_chat_id = messages[0].message.chat_id
     message_ids = [tm.message.id for tm in messages]
 
-    for dest in destinations:
+    for dest_chat in dest_chats:
         try:
-            forwarded = await client.forward_messages(dest, message_ids, source_chat_id)
+            dest_objs = await client.forward_messages(dest_chat, message_ids, source_chat_id)
 
-            if not isinstance(forwarded, list):
-                forwarded = [forwarded]
+            if not isinstance(dest_objs, list):
+                dest_objs = [dest_objs]
 
-            if len(forwarded) != len(messages):
+            if len(dest_objs) != len(messages):
                 logging.error(
                     f"Album size mismatch: expected {len(messages)}, "
-                    f"got {len(forwarded)}"
+                    f"got {len(dest_objs)}"
                 )
             # Update storage for each message in the album
-            for tm, fwd_msg in zip(messages, forwarded):
+            for tm, dest_obj in zip(messages, dest_objs):
                 event_uid = (source_chat_id, tm.message.id)
                 if event_uid not in stored:
                     stored[event_uid] = {}
-                stored[event_uid][dest] = fwd_msg.id
+                stored[event_uid][dest_chat] = dest_obj.id
 
         except Exception as err:
             logging.warning(
-                f"Failed to forward album to {dest}: {err}. Trying anonymous send..."
+                f"Failed to forward album to {dest_chat}: {err}. Trying anonymous send..."
             )
             # TODO: fallback needs config which we don't have here
             raise
@@ -239,7 +239,7 @@ async def forward_album(
 
 async def forward_single_message(
     tm: TgcfMessage,
-    destinations: list[int],
+    dest_chats: list[int],
     config: Config,
     stored: ForwardMap,
 ) -> None:
@@ -250,7 +250,7 @@ async def forward_single_message(
 
     Args:
         tm: Wrapped message (may have been modified by plugins).
-        destinations: Destination chat IDs.
+        dest_chats: Destination chat IDs.
         config: Global forwarding configuration.
         stored: Forward map updated with sent message IDs.
     """
@@ -264,19 +264,19 @@ async def forward_single_message(
             tm.message.chat_id, tm.message.reply_to_msg_id, config, stored
         )
 
-    for dest in destinations:
+    for dest_chat in dest_chats:
         try:
-            tm.reply_to = reply_to_mapping.get(dest)
-            fwded_msg = await send_message(dest, tm, config)
-            stored[event_uid][dest] = fwded_msg.id
+            tm.reply_to = reply_to_mapping.get(dest_chat)
+            dest_obj = await send_message(dest_chat, tm, config)
+            stored[event_uid][dest_chat] = dest_obj.id
         except Exception as err:
-            logging.error(f"Failed to forward message {tm.message.id} to {dest}: {err}")
+            logging.error(f"Failed to forward message {tm.message.id} to {dest_chat}: {err}")
 
 
 async def send_single_message_with_fallback(
     client: TelegramClient,
     message: Message,
-    dest: int,
+    dest_chat: int,
     config: Config,
 ) -> None:
     """Send a message with download+reupload fallback for protected content.
@@ -284,7 +284,7 @@ async def send_single_message_with_fallback(
     Args:
         client: Telegram client.
         message: Raw Telegram message.
-        dest: Destination chat ID.
+        dest_chat: Destination chat ID.
         config: Global forwarding configuration.
 
     Raises:
@@ -294,12 +294,12 @@ async def send_single_message_with_fallback(
     tm.client = client
 
     try:
-        await send_message(dest, tm, config)
-        logging.info(f"Sent message to {dest} (direct)")
+        await send_message(dest_chat, tm, config)
+        logging.info(f"Sent message to {dest_chat} (direct)")
         return
     except Exception as err:
         logging.info(
-            f"Direct send failed for {dest}: {err}. "
+            f"Direct send failed for {dest_chat}: {err}. "
             "Falling back to download+reupload."
         )
 
@@ -315,8 +315,8 @@ async def send_single_message_with_fallback(
 
         logging.info(f"Downloaded media to {file_path}")
 
-        await client.send_file(dest, file_path, caption=message.text)
-        logging.info(f"Sent message to {dest} (via download+reupload)")
+        await client.send_file(dest_chat, file_path, caption=message.text)
+        logging.info(f"Sent message to {dest_chat} (via download+reupload)")
     finally:
         if file_path and os.path.exists(file_path):
             os.remove(file_path)
@@ -326,7 +326,7 @@ async def send_single_message_with_fallback(
 async def send_album_with_fallback(
     client: TelegramClient,
     messages: list[TgcfMessage],
-    dest_ids: list[int],
+    dest_chats: list[int],
     config: Config,
     stored: ForwardMap,
 ) -> None:
@@ -335,7 +335,7 @@ async def send_album_with_fallback(
     Args:
         client: Telegram client.
         messages: Album messages.
-        dest_ids: Destination chat IDs.
+        dest_chats: Destination chat IDs.
         config: Global forwarding configuration.
         stored: Forward map updated with sent message IDs.
     """
@@ -343,7 +343,7 @@ async def send_album_with_fallback(
         return
 
     try:
-        await forward_album_anonymous(client, messages, dest_ids, config, stored)
+        await forward_album_anonymous(client, messages, dest_chats, config, stored)
         logging.info("Sent album to destinations (direct)")
         return
     except Exception as err:
@@ -367,12 +367,12 @@ async def send_album_with_fallback(
             raise ValueError("Failed to download any media for album")
 
         # Re-upload as new album to all destinations
-        for dest in dest_ids:
+        for dest_chat in dest_chats:
             try:
-                await client.send_file(dest, downloaded_files, caption=captions)
-                logging.info(f"Sent album to {dest} (via download+reupload)")
+                await client.send_file(dest_chat, downloaded_files, caption=captions)
+                logging.info(f"Sent album to {dest_chat} (via download+reupload)")
             except Exception as err:
-                logging.error(f"Failed to send album via fallback to {dest}: {err}")
+                logging.error(f"Failed to send album via fallback to {dest_chat}: {err}")
     finally:
         for file_path in downloaded_files:
             if os.path.exists(file_path):
@@ -382,7 +382,7 @@ async def send_album_with_fallback(
 
 async def resolve_dest_ids(
     client: TelegramClient,
-    destinations: list[int | str],
+    raw_dests: list[int | str],
 ) -> list[int]:
     """Resolve a list of destinations to their numeric chat IDs.
 
@@ -393,31 +393,31 @@ async def resolve_dest_ids(
 
     Args:
         client: Authenticated TelegramClient.
-        destinations: List of destination chat IDs or usernames.
+        raw_dests: List of destination chat IDs or usernames.
 
     Returns:
         List of resolved numeric chat IDs.
     """
-    dest_ids: list[int] = []
-    for dest in destinations:
+    dest_chats: list[int] = []
+    for raw_dest in raw_dests:
         try:
-            if isinstance(dest, int):
-                dest_ids.append(dest)
-            elif dest.lstrip("-").isdigit():
-                dest_ids.append(int(dest))
+            if isinstance(raw_dest, int):
+                dest_chats.append(raw_dest)
+            elif raw_dest.lstrip("-").isdigit():
+                dest_chats.append(int(raw_dest))
             else:
-                entity = await client.get_entity(dest)
-                dest_ids.append(get_peer_id(entity))
+                entity = await client.get_entity(raw_dest)
+                dest_chats.append(get_peer_id(entity))
         except Exception as err:
-            logging.error(f"Failed to resolve destination {dest}: {err}")
+            logging.error(f"Failed to resolve destination {raw_dest}: {err}")
             raise
-    return dest_ids
+    return dest_chats
 
 
 async def forward_by_link(
     client: TelegramClient,
     url: str,
-    destinations: list[int | str],
+    raw_dests: list[int | str],
     config: Config,
 ) -> None:
     """Forward a message or album by its Telegram post link.
@@ -428,7 +428,7 @@ async def forward_by_link(
     Args:
         client: Authenticated Telegram client.
         url: Telegram post link (``t.me/...``).
-        destinations: Destination chat IDs or usernames.
+        raw_dests: Destination chat IDs or usernames.
         config: Global forwarding configuration.
 
     Raises:
@@ -441,7 +441,7 @@ async def forward_by_link(
     channel, msg_id = parsed
     logging.info(f"Parsed link: channel={channel}, msg_id={msg_id}")
 
-    dest_ids = await resolve_dest_ids(client, destinations)
+    dest_chats = await resolve_dest_ids(client, raw_dests)
 
     stored: ForwardMap = {}
 
@@ -458,10 +458,10 @@ async def forward_by_link(
         )
 
         messages = album_buffer.flush()
-        await send_album_with_fallback(client, messages, dest_ids, config, stored)
+        await send_album_with_fallback(client, messages, dest_chats, config, stored)
     else:
-        for dest in dest_ids:
+        for dest_chat in dest_chats:
             try:
-                await send_single_message_with_fallback(client, message, dest, config)
+                await send_single_message_with_fallback(client, message, dest_chat, config)
             except Exception as err:
-                logging.error(f"Failed to send message to {dest}: {err}")
+                logging.error(f"Failed to send message to {dest_chat}: {err}")

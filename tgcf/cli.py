@@ -187,7 +187,7 @@ def main(
 @app.command()
 def link(
     url: str = typer.Argument(..., help="Telegram post link (e.g., https://t.me/channel/123)"),
-    dest: list[str] = typer.Option(
+    raw_dests: list[str] = typer.Option(
         ..., "--dest", "-d", help="Destination chat ID or username (can specify multiple)"
     ),
     verbose: bool | None = typer.Option(
@@ -210,4 +210,4 @@ def link(
     """
     config_path = _load_env_and_config_path()
 
-    asyncio.run(forward_link_job(url, dest, config_path))
+    asyncio.run(forward_link_job(url, raw_dests, config_path))
