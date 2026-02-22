@@ -82,7 +82,7 @@ async def send_album(
 
 def get_reply_to_mapping(
     src_chat: int,
-    reply_to_msg_id: int,
+    reply_msg: int,
     config: Config,
     stored: ForwardMap,
 ) -> dict[int, int | None]:
@@ -93,7 +93,7 @@ def get_reply_to_mapping(
 
     Args:
         src_chat: Chat where the original message lives.
-        reply_to_msg_id: ID the original message replies to.
+        reply_msg: ID the original message replies to.
         config: Global configuration (checked for ``reply_chain``).
         stored: Forward map with previously sent IDs.
 
@@ -104,7 +104,7 @@ def get_reply_to_mapping(
     if not config.reply_chain:
         return {}
 
-    reply_src_uid = (src_chat, reply_to_msg_id)
+    reply_src_uid = (src_chat, reply_msg)
 
     if reply_src_uid in stored:
         return stored[reply_src_uid]
@@ -208,11 +208,11 @@ async def forward_album(
         return
 
     src_chat = messages[0].message.chat_id
-    message_ids = [tm.message.id for tm in messages]
+    src_msgs = [tm.message.id for tm in messages]
 
     for dest_chat in dest_chats:
         try:
-            dest_objs = await client.forward_messages(dest_chat, message_ids, src_chat)
+            dest_objs = await client.forward_messages(dest_chat, src_msgs, src_chat)
 
             if not isinstance(dest_objs, list):
                 dest_objs = [dest_objs]
@@ -440,15 +440,15 @@ async def forward_by_link(
     if not parsed:
         raise ValueError(f"Invalid Telegram link: {url}")
 
-    channel, msg_id = parsed
-    logging.info(f"Parsed link: channel={channel}, msg_id={msg_id}")
+    channel, src_msg = parsed
+    logging.info(f"Parsed link: channel={channel}, src_msg={src_msg}")
 
     dest_chats = await resolve_dest_ids(client, raw_dests)
 
     stored: ForwardMap = {}
 
     # Fetch the target message
-    message = await client.get_messages(channel, ids=msg_id)
+    message = await client.get_messages(channel, ids=src_msg)
     if not message:
         raise ValueError(f"Message not found: {url}")
 
@@ -456,7 +456,7 @@ async def forward_by_link(
 
     if message.grouped_id:
         album_buffer = await fetch_album_by_message(
-            client, channel, msg_id, message.grouped_id
+            client, channel, src_msg, message.grouped_id
         )
 
         messages = album_buffer.flush()

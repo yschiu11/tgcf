@@ -161,8 +161,8 @@ class ForwardingPipeline:
         return PipelineResult(PipelineStatus.SENT)
 
     async def handle_delete(self, src_chat: int, deleted_ids: list[int]) -> PipelineResult:
-        for msg_id in deleted_ids:
-            src_uid = (src_chat, msg_id)
+        for src_msg in deleted_ids:
+            src_uid = (src_chat, src_msg)
             dest_map = self.history.records.get(src_uid)
             if dest_map:
                 for dest_chat, dest_msg in dest_map.items():

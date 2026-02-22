@@ -75,9 +75,9 @@ def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
         m = re.match(pattern, url)
         if m:
             channel: str | int = m.group(1)
-            msg_id = int(m.group(2))
+            src_msg = int(m.group(2))
             # For private links, convert to proper channel ID format
             if is_private:
                 channel = int(f"-100{channel}")
-            return (channel, msg_id)
+            return (channel, src_msg)
     return None
