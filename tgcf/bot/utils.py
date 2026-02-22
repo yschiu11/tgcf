@@ -55,10 +55,10 @@ def display_forwards(forwards: List[Forward]) -> str:
     return forward_str
 
 
-def remove_source(source, forwards: List[Forward]) -> List[Forward]:
+def remove_source(raw_src, forwards: List[Forward]) -> List[Forward]:
     """Remove a source from forwards."""
     for i, forward in enumerate(forwards):
-        if forward.source == source:
+        if forward.source == raw_src:
             del forwards[i]
             return forwards
     raise ValueError("The source does not exist")

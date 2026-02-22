@@ -86,8 +86,8 @@ def make_remove_command_handler(ctx: TgcfContext):
                 raise ValueError(f"{notes}\n{display_forwards(ctx.config.forwards)}")
 
             parsed_args = yaml.safe_load(args)
-            source_to_remove = parsed_args.get("source")
-            ctx.config.forwards = remove_source(source_to_remove, ctx.config.forwards)
+            raw_src = parsed_args.get("source")
+            ctx.config.forwards = remove_source(raw_src, ctx.config.forwards)
             ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
             await cmd_event.respond("Success")
