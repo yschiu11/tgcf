@@ -21,7 +21,7 @@ ForwardMap = dict[tuple[int, int], dict[int, int | None]]
 
 async def send_message(
     dest_chat: EntityLike,
-    tm: TgcfMessage,
+    wrapped_msg: TgcfMessage,
     config: Config,
 ) -> Message:
     """Send a message to a recipient, forwarding or copying per config.
@@ -31,16 +31,16 @@ async def send_message(
 
     Args:
         dest_chat: Destination chat.
-        tm: Wrapped message to send.
+        wrapped_msg: Wrapped message to send.
         config: Global forwarding configuration.
 
     Returns:
         The sent or forwarded ``Message`` object.
     """
-    client: TelegramClient = tm.client
+    client: TelegramClient = wrapped_msg.client
     if config.show_forwarded_from:
         try:
-            return await client.forward_messages(dest_chat, tm.message)
+            return await client.forward_messages(dest_chat, wrapped_msg.message)
         except Exception as err:
             logging.warning(
                 f"Failed to forward message to {dest_chat}: {err}. "
@@ -49,13 +49,13 @@ async def send_message(
             # Fallback to anonymous sending
 
     # Anonymous sending (either by config or as fallback)
-    if tm.new_file:
-        dest_obj = await client.send_file(
-            dest_chat, tm.new_file, caption=tm.text, reply_to=tm.reply_to
+    if wrapped_msg.new_file:
+        dest_api_msg = await client.send_file(
+            dest_chat, wrapped_msg.new_file, caption=wrapped_msg.text, reply_to=wrapped_msg.reply_to
         )
-        return dest_obj
-    tm.message.text = tm.text
-    return await client.send_message(dest_chat, tm.message, reply_to=tm.reply_to)
+        return dest_api_msg
+    wrapped_msg.message.text = wrapped_msg.text
+    return await client.send_message(dest_chat, wrapped_msg.message, reply_to=wrapped_msg.reply_to)
 
 
 async def send_album(
@@ -140,10 +140,10 @@ async def forward_album_anonymous(
     files_to_send = []
     captions = []
 
-    for tm in messages:
-        if tm.message.media:
-            files_to_send.append(tm.message.media)
-            captions.append(tm.text or "")
+    for wrapped_msg in messages:
+        if wrapped_msg.message.media:
+            files_to_send.append(wrapped_msg.message.media)
+            captions.append(wrapped_msg.text or "")
 
     if not files_to_send:
         logging.error(
@@ -163,27 +163,27 @@ async def forward_album_anonymous(
         try:
             reply_to = reply_to_mapping.get(dest_chat, None)
 
-            dest_objs = await client.send_file(
+            dest_api_msgs = await client.send_file(
                 dest_chat,
                 files_to_send,
                 caption=captions,
                 reply_to=reply_to,
             )
 
-            if not isinstance(dest_objs, list):
-                dest_objs = [dest_objs]
+            if not isinstance(dest_api_msgs, list):
+                dest_api_msgs = [dest_api_msgs]
 
-            if len(dest_objs) != len(messages):
+            if len(dest_api_msgs) != len(messages):
                 logging.error(
                     f"Album size mismatch: expected {len(messages)}, "
-                    f"got {len(dest_objs)}"
+                    f"got {len(dest_api_msgs)}"
                 )
             # Update storage for each sent message
-            for tm, dest_obj in zip(messages, dest_objs):
-                src_uid = (src_chat, tm.message.id)
+            for wrapped_msg, dest_api_msg in zip(messages, dest_api_msgs):
+                src_uid = (src_chat, wrapped_msg.message.id)
                 if src_uid not in stored:
                     stored[src_uid] = {}
-                stored[src_uid][dest_chat] = dest_obj.id
+                stored[src_uid][dest_chat] = dest_api_msg.id
 
         except Exception as err:
             logging.error(f"Failed to send album to {dest_chat}: {err}")
@@ -208,26 +208,26 @@ async def forward_album(
         return
 
     src_chat = messages[0].message.chat_id
-    src_msgs = [tm.message.id for tm in messages]
+    src_msgs = [wrapped_msg.message.id for wrapped_msg in messages]
 
     for dest_chat in dest_chats:
         try:
-            dest_objs = await client.forward_messages(dest_chat, src_msgs, src_chat)
+            dest_api_msgs = await client.forward_messages(dest_chat, src_msgs, src_chat)
 
-            if not isinstance(dest_objs, list):
-                dest_objs = [dest_objs]
+            if not isinstance(dest_api_msgs, list):
+                dest_api_msgs = [dest_api_msgs]
 
-            if len(dest_objs) != len(messages):
+            if len(dest_api_msgs) != len(messages):
                 logging.error(
                     f"Album size mismatch: expected {len(messages)}, "
-                    f"got {len(dest_objs)}"
+                    f"got {len(dest_api_msgs)}"
                 )
             # Update storage for each message in the album
-            for tm, dest_obj in zip(messages, dest_objs):
-                src_uid = (src_chat, tm.message.id)
+            for wrapped_msg, dest_api_msg in zip(messages, dest_api_msgs):
+                src_uid = (src_chat, wrapped_msg.message.id)
                 if src_uid not in stored:
                     stored[src_uid] = {}
-                stored[src_uid][dest_chat] = dest_obj.id
+                stored[src_uid][dest_chat] = dest_api_msg.id
 
         except Exception as err:
             logging.warning(
@@ -238,41 +238,41 @@ async def forward_album(
 
 
 async def forward_single_message(
-    tm: TgcfMessage,
+    wrapped_msg: TgcfMessage,
     dest_chats: list[int],
     config: Config,
     stored: ForwardMap,
 ) -> None:
     """Forward a single message to all destinations.
 
-    Respects plugin modifications applied to ``tm`` and maintains
+    Respects plugin modifications applied to ``wrapped_msg`` and maintains
     reply chain mapping in ``stored``.
 
     Args:
-        tm: Wrapped message (may have been modified by plugins).
+        wrapped_msg: Wrapped message (may have been modified by plugins).
         dest_chats: Destination chat IDs.
         config: Global forwarding configuration.
         stored: Forward map updated with sent message IDs.
     """
     # If the message handles replies, look up the forwarded reply-to ID
     reply_to = None
-    src_uid = (tm.message.chat_id, tm.message.id)
+    src_uid = (wrapped_msg.message.chat_id, wrapped_msg.message.id)
     if src_uid not in stored:
         stored[src_uid] = {}
 
     reply_to_mapping: dict[int, int | None] = {}
-    if tm.message.is_reply:
+    if wrapped_msg.message.is_reply:
         reply_to_mapping = get_reply_to_mapping(
-            tm.message.chat_id, tm.message.reply_to_msg_id, config, stored
+            wrapped_msg.message.chat_id, wrapped_msg.message.reply_to_msg_id, config, stored
         )
 
     for dest_chat in dest_chats:
         try:
-            tm.reply_to = reply_to_mapping.get(dest_chat)
-            dest_obj = await send_message(dest_chat, tm, config)
-            stored[src_uid][dest_chat] = dest_obj.id
+            wrapped_msg.reply_to = reply_to_mapping.get(dest_chat)
+            dest_api_msg = await send_message(dest_chat, wrapped_msg, config)
+            stored[src_uid][dest_chat] = dest_api_msg.id
         except Exception as err:
-            logging.error(f"Failed to forward message {tm.message.id} to {dest_chat}: {err}")
+            logging.error(f"Failed to forward message {wrapped_msg.message.id} to {dest_chat}: {err}")
 
 
 async def send_single_message_with_fallback(
@@ -292,11 +292,11 @@ async def send_single_message_with_fallback(
     Raises:
         ValueError: If the message is text-only (no media to reupload).
     """
-    tm = TgcfMessage(message)
-    tm.client = client
+    wrapped_msg = TgcfMessage(message)
+    wrapped_msg.client = client
 
     try:
-        await send_message(dest_chat, tm, config)
+        await send_message(dest_chat, wrapped_msg, config)
         logging.info(f"Sent message to {dest_chat} (direct)")
         return
     except Exception as err:
@@ -354,12 +354,12 @@ async def send_album_with_fallback(
         )
 
     # Fallback: download all media and re-upload
-    captions = [tm.text or "" for tm in messages if tm.message.media]
+    captions = [wrapped_msg.text or "" for wrapped_msg in messages if wrapped_msg.message.media]
     downloaded_files: list[str] = []
     try:
-        for tm in messages:
-            if tm.message.media:
-                file_path = await tm.message.download_media("")
+        for wrapped_msg in messages:
+            if wrapped_msg.message.media:
+                file_path = await wrapped_msg.message.download_media("")
                 if file_path:
                     downloaded_files.append(file_path)
                     logging.info(f"Downloaded: {file_path}")

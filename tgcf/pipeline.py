@@ -70,41 +70,41 @@ class ForwardingPipeline:
         return src_chat not in self.buffers
 
     async def handle_message(self, packet: MessagePacket) -> PipelineResult:
-        msg = packet.raw_message
+        api_msg = packet.raw_message
         src_chat = packet.src_chat
         did_flush = False
 
-        if isinstance(msg, MessageService):
+        if isinstance(api_msg, MessageService):
             return PipelineResult(PipelineStatus.IGNORED)
 
         self.history.prune(const.KEEP_LAST_MANY)
 
-        tm = await apply_plugins(msg, self.config.plugins)
-        if not tm:
+        wrapped_msg = await apply_plugins(api_msg, self.config.plugins)
+        if not wrapped_msg:
             return PipelineResult(PipelineStatus.IGNORED)
 
         if src_chat in self.buffers:
             buffer, _ = self.buffers[src_chat]
-            if buffer.should_flush(msg.grouped_id):
+            if buffer.should_flush(api_msg.grouped_id):
                 await self._flush_buffer(src_chat)
                 did_flush = True
 
-        if msg.grouped_id:
+        if api_msg.grouped_id:
             if src_chat not in self.buffers:
                 self.buffers[src_chat] = (AlbumBuffer(), packet.dest_chats)
 
             buffer, _ = self.buffers[src_chat]
-            buffer.add_message(tm)
+            buffer.add_message(wrapped_msg)
             self.history.add_placeholder(
                 src_chat=src_chat,
-                src_msg=msg.id,
+                src_msg=api_msg.id,
                 dest_chats=packet.dest_chats
             )
 
             return PipelineResult(PipelineStatus.BUFFERED, did_flush=did_flush)
         else:
-            await forward_single_message(tm, packet.dest_chats, self.config, self.history.records)
-            tm.clear()
+            await forward_single_message(wrapped_msg, packet.dest_chats, self.config, self.history.records)
+            wrapped_msg.clear()
             return PipelineResult(PipelineStatus.SENT, packet.dest_chats, did_flush)
 
     async def flush(self, src_chat: int) -> None:
@@ -129,35 +129,35 @@ class ForwardingPipeline:
             else:
                 await forward_single_message(messages[0], dest_chats, self.config, self.history.records)
         finally:
-            for tm in messages:
-                tm.clear()
+            for wrapped_msg in messages:
+                wrapped_msg.clear()
 
     async def handle_edit(self, packet: MessagePacket) -> PipelineResult:
-        msg = packet.raw_message
+        api_msg = packet.raw_message
         src_chat = packet.src_chat
 
-        tm = await apply_plugins(msg, self.config.plugins)
-        if not tm:
+        wrapped_msg = await apply_plugins(api_msg, self.config.plugins)
+        if not wrapped_msg:
             return PipelineResult(PipelineStatus.IGNORED)
 
-        src_uid = (src_chat, msg.id)
+        src_uid = (src_chat, api_msg.id)
         dest_map = self.history.records.get(src_uid)
 
         if dest_map:
             for dest_chat, dest_msg in dest_map.items():
                 if dest_msg is None:
                     continue
-                if self.config.live.delete_on_edit == msg.text:
+                if self.config.live.delete_on_edit == api_msg.text:
                     await self.client.delete_messages(dest_chat, dest_msg)
                 else:
-                    if msg.media:
+                    if api_msg.media:
                         logging.warning("Media edits are not supported by Telegram API, only text/caption edits are synced")
-                    await self.client.edit_message(dest_chat, dest_msg, text=tm.text)
-            tm.clear()
+                    await self.client.edit_message(dest_chat, dest_msg, text=wrapped_msg.text)
+            wrapped_msg.clear()
             return PipelineResult(PipelineStatus.SENT)
 
-        await forward_single_message(tm, packet.dest_chats, self.config, self.history.records)
-        tm.clear()
+        await forward_single_message(wrapped_msg, packet.dest_chats, self.config, self.history.records)
+        wrapped_msg.clear()
         return PipelineResult(PipelineStatus.SENT)
 
     async def handle_delete(self, src_chat: int, deleted_ids: list[int]) -> PipelineResult:

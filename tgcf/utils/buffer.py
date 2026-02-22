@@ -19,10 +19,10 @@ class AlbumBuffer:
         self.messages: list[TgcfMessage] = []
         self.current_group_id: int | None = None
 
-    def add_message(self, tm: TgcfMessage) -> None:
+    def add_message(self, wrapped_msg: TgcfMessage) -> None:
         """Add a message to the current album buffer."""
-        self.messages.append(tm)
-        self.current_group_id = tm.message.grouped_id
+        self.messages.append(wrapped_msg)
+        self.current_group_id = wrapped_msg.message.grouped_id
 
     def should_flush(self, next_grouped_id: int | None) -> bool:
         """Check whether the buffer should be flushed before the next message.
@@ -61,8 +61,8 @@ class AlbumBuffer:
 
     def clear(self) -> None:
         """Clear the buffer and release resources held by each message."""
-        for tm in self.messages:
-            tm.clear()
+        for wrapped_msg in self.messages:
+            wrapped_msg.clear()
         self.messages.clear()
         self.current_group_id = None
 
