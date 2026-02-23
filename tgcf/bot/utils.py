@@ -26,7 +26,7 @@ def make_admin_protect(ctx):
     return admin_protect
 
 
-def get_args(text: str) -> str:
+def get_cmd_payload(text: str) -> str:
     """Return the part of message following the command."""
     splitted = text.split(" ", 1)
 
@@ -35,10 +35,10 @@ def get_args(text: str) -> str:
         if not len(splitted) == 2:
             return ""
 
-    prefix, args = splitted
-    args = args.strip()
-    logging.info(f"Got command {prefix} with args {args}")
-    return args
+    prefix, payload_text = splitted
+    payload_text = payload_text.strip()
+    logging.info(f"Got command {prefix} with payload: {payload_text}")
+    return payload_text
 
 
 def display_forwards(forwards: List[Forward]) -> str:
