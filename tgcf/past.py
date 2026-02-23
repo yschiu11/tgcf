@@ -47,9 +47,9 @@ async def forward_job(ctx: TgcfContext) -> None:
                     await asyncio.sleep(config.past.delay)
                     logging.info(f"Slept for {config.past.delay} seconds")
 
-                except FloodWaitError as fwe:
-                    logging.info(f"Sleeping for {fwe}")
-                    await asyncio.sleep(delay=fwe.seconds)
+                except FloodWaitError as wait_err:
+                    logging.info(f"Sleeping for {wait_err}")
+                    await asyncio.sleep(delay=wait_err.seconds)
                 except Exception as err:
                     logging.exception(err)
 

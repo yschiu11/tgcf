@@ -78,7 +78,7 @@ class Config(BaseModel):
     """The blueprint for tgcf's whole config."""
 
     # pylint: disable=too-few-public-
-    pid: int = 0
+    process_id: int = 0
     theme: str = "light"
     login: LoginConfig = LoginConfig()
     admins: List[Union[int, str]] = []
