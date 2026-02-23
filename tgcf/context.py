@@ -20,7 +20,7 @@ class TgcfContext:
 
     # Resolved mappings, compute once after client connects
     # Map src_chat -> (Forward object, resolved dest_chats)
-    from_to: dict[int, tuple[Forward, list[int]]] = field(default_factory=dict)
+    routing_map: dict[int, tuple[Forward, list[int]]] = field(default_factory=dict)
     admins: list[int] = field(default_factory=list)
 
     history: MessageHistory = None

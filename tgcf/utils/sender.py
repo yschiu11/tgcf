@@ -63,7 +63,7 @@ async def send_album(
     messages: list[TgcfMessage],
     dest_chats: list[int],
     config: Config,
-    stored: ForwardMap,
+    history_map: ForwardMap,
 ) -> None:
     """Dispatch an album to destinations via forward or anonymous copy.
 
@@ -72,19 +72,19 @@ async def send_album(
         messages: Album messages.
         dest_chats: Destination chat IDs.
         config: Global forwarding configuration.
-        stored: Forward map updated with sent message IDs.
+        history_map: Forward map updated with sent message IDs.
     """
     if config.show_forwarded_from:
-        await forward_album(client, messages, dest_chats, stored)
+        await forward_album(client, messages, dest_chats, history_map)
     else:
-        await forward_album_anonymous(client, messages, dest_chats, config, stored)
+        await forward_album_anonymous(client, messages, dest_chats, config, history_map)
 
 
 def get_reply_to_mapping(
     src_chat: int,
     reply_msg: int,
     config: Config,
-    stored: ForwardMap,
+    history_map: ForwardMap,
 ) -> dict[int, int | None]:
     """Look up forwarded reply-to IDs for each destination.
 
@@ -95,7 +95,7 @@ def get_reply_to_mapping(
         src_chat: Chat where the original message lives.
         reply_msg: ID the original message replies to.
         config: Global configuration (checked for ``reply_chain``).
-        stored: Forward map with previously sent IDs.
+        history_map: Forward map with previously sent IDs.
 
     Returns:
         Mapping of destination chat ID to reply-to message ID,
@@ -106,8 +106,8 @@ def get_reply_to_mapping(
 
     reply_src_uid = (src_chat, reply_msg)
 
-    if reply_src_uid in stored:
-        return stored[reply_src_uid]
+    if reply_src_uid in history_map:
+        return history_map[reply_src_uid]
 
     return {}
 
@@ -117,7 +117,7 @@ async def forward_album_anonymous(
     messages: list[TgcfMessage],
     dest_chats: list[int],
     config: Config,
-    stored: ForwardMap,
+    history_map: ForwardMap,
 ) -> None:
     """Re-upload album media as new messages (no 'Forwarded from' tag).
 
@@ -126,7 +126,7 @@ async def forward_album_anonymous(
         messages: Album messages.
         dest_chats: Destination chat IDs.
         config: Global configuration (used for reply chaining).
-        stored: Forward map updated with sent message IDs.
+        history_map: Forward map updated with sent message IDs.
 
     Raises:
         Exception: Propagated from the Telegram API on send failure.
@@ -156,7 +156,7 @@ async def forward_album_anonymous(
     reply_to_mapping: dict[int, int | None] = {}
     if first_message.is_reply:
         reply_to_mapping = get_reply_to_mapping(
-            src_chat, first_message.reply_to_msg_id, config, stored
+            src_chat, first_message.reply_to_msg_id, config, history_map
         )
 
     for dest_chat in dest_chats:
@@ -181,9 +181,9 @@ async def forward_album_anonymous(
             # Update storage for each sent message
             for wrapped_msg, dest_api_msg in zip(messages, dest_api_msgs):
                 src_uid = (src_chat, wrapped_msg.message.id)
-                if src_uid not in stored:
-                    stored[src_uid] = {}
-                stored[src_uid][dest_chat] = dest_api_msg.id
+                if src_uid not in history_map:
+                    history_map[src_uid] = {}
+                history_map[src_uid][dest_chat] = dest_api_msg.id
 
         except Exception as err:
             logging.error(f"Failed to send album to {dest_chat}: {err}")
@@ -194,7 +194,7 @@ async def forward_album(
     client: TelegramClient,
     messages: list[TgcfMessage],
     dest_chats: list[int],
-    stored: ForwardMap,
+    history_map: ForwardMap,
 ) -> None:
     """Forward an album using native Telegram forward (preserves attribution).
 
@@ -202,7 +202,7 @@ async def forward_album(
         client: Telegram client.
         messages: Album messages.
         dest_chats: Destination chat IDs.
-        stored: Forward map updated with forwarded message IDs.
+        history_map: Forward map updated with forwarded message IDs.
     """
     if not messages:
         return
@@ -225,9 +225,9 @@ async def forward_album(
             # Update storage for each message in the album
             for wrapped_msg, dest_api_msg in zip(messages, dest_api_msgs):
                 src_uid = (src_chat, wrapped_msg.message.id)
-                if src_uid not in stored:
-                    stored[src_uid] = {}
-                stored[src_uid][dest_chat] = dest_api_msg.id
+                if src_uid not in history_map:
+                    history_map[src_uid] = {}
+                history_map[src_uid][dest_chat] = dest_api_msg.id
 
         except Exception as err:
             logging.warning(
@@ -241,36 +241,36 @@ async def forward_single_message(
     wrapped_msg: TgcfMessage,
     dest_chats: list[int],
     config: Config,
-    stored: ForwardMap,
+    history_map: ForwardMap,
 ) -> None:
     """Forward a single message to all destinations.
 
     Respects plugin modifications applied to ``wrapped_msg`` and maintains
-    reply chain mapping in ``stored``.
+    reply chain mapping in ``history_map``.
 
     Args:
         wrapped_msg: Wrapped message (may have been modified by plugins).
         dest_chats: Destination chat IDs.
         config: Global forwarding configuration.
-        stored: Forward map updated with sent message IDs.
+        history_map: Forward map updated with sent message IDs.
     """
     # If the message handles replies, look up the forwarded reply-to ID
     reply_to = None
     src_uid = (wrapped_msg.message.chat_id, wrapped_msg.message.id)
-    if src_uid not in stored:
-        stored[src_uid] = {}
+    if src_uid not in history_map:
+        history_map[src_uid] = {}
 
     reply_to_mapping: dict[int, int | None] = {}
     if wrapped_msg.message.is_reply:
         reply_to_mapping = get_reply_to_mapping(
-            wrapped_msg.message.chat_id, wrapped_msg.message.reply_to_msg_id, config, stored
+            wrapped_msg.message.chat_id, wrapped_msg.message.reply_to_msg_id, config, history_map
         )
 
     for dest_chat in dest_chats:
         try:
             wrapped_msg.reply_to = reply_to_mapping.get(dest_chat)
             dest_api_msg = await send_message(dest_chat, wrapped_msg, config)
-            stored[src_uid][dest_chat] = dest_api_msg.id
+            history_map[src_uid][dest_chat] = dest_api_msg.id
         except Exception as err:
             logging.error(f"Failed to forward message {wrapped_msg.message.id} to {dest_chat}: {err}")
 
@@ -330,7 +330,7 @@ async def send_album_with_fallback(
     messages: list[TgcfMessage],
     dest_chats: list[int],
     config: Config,
-    stored: ForwardMap,
+    history_map: ForwardMap,
 ) -> None:
     """Send an album with download+reupload fallback for protected content.
 
@@ -339,13 +339,13 @@ async def send_album_with_fallback(
         messages: Album messages.
         dest_chats: Destination chat IDs.
         config: Global forwarding configuration.
-        stored: Forward map updated with sent message IDs.
+        history_map: Forward map updated with sent message IDs.
     """
     if not messages:
         return
 
     try:
-        await forward_album_anonymous(client, messages, dest_chats, config, stored)
+        await forward_album_anonymous(client, messages, dest_chats, config, history_map)
         logging.info("Sent album to destinations (direct)")
         return
     except Exception as err:
@@ -445,7 +445,7 @@ async def forward_by_link(
 
     dest_chats = await resolve_dest_ids(client, raw_dests)
 
-    stored: ForwardMap = {}
+    history_map: ForwardMap = {}
 
     # Fetch the target message
     message = await client.get_messages(channel, ids=src_msg)
@@ -460,7 +460,7 @@ async def forward_by_link(
         )
 
         messages = album_buffer.flush()
-        await send_album_with_fallback(client, messages, dest_chats, config, stored)
+        await send_album_with_fallback(client, messages, dest_chats, config, history_map)
     else:
         for dest_chat in dest_chats:
             try:

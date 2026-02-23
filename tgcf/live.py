@@ -42,11 +42,11 @@ def make_new_message_handler(ctx: TgcfContext):
         """Process new incoming messages with album buffering support."""
         src_chat = new_msg_event.chat_id
 
-        if src_chat not in ctx.from_to:
+        if src_chat not in ctx.routing_map:
             return
         logging.info(f"New message received in {src_chat}")
 
-        _, dest_chats = ctx.from_to[src_chat]
+        _, dest_chats = ctx.routing_map[src_chat]
 
         packet = MessagePacket(
             raw_message=new_msg_event.message,
@@ -73,11 +73,11 @@ def make_edited_message_handler(ctx: TgcfContext):
         """Handle message edits."""
         src_chat = edit_msg_event.chat_id
 
-        if src_chat not in ctx.from_to:
+        if src_chat not in ctx.routing_map:
             return
 
         logging.info(f"Message edited in {src_chat}")
-        _, dest_chats = ctx.from_to[src_chat]
+        _, dest_chats = ctx.routing_map[src_chat]
 
         packet = MessagePacket(
             raw_message=edit_msg_event.message,
@@ -96,7 +96,7 @@ def make_deleted_message_handler(ctx: TgcfContext):
     async def handler(del_msg_event) -> None:
         """Handle message deletes."""
         src_chat = del_msg_event.chat_id
-        if src_chat not in ctx.from_to:
+        if src_chat not in ctx.routing_map:
             return
 
         logging.info(f"Message deleted in {src_chat}")
@@ -128,7 +128,7 @@ async def start_sync(ctx: TgcfContext) -> None:
     """Start tgcf live sync.
 
     Args:
-        ctx: Fully-initialized TgcfContext with client, from_to, and admins
+        ctx: Fully-initialized TgcfContext with client, routing_map, and admins
     """
     config = ctx.config
     logging.info(f"ctx.is_bot={ctx.is_bot}")

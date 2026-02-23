@@ -18,12 +18,12 @@ async def forward_job(ctx: TgcfContext) -> None:
     Forward all existing messages in the concerned chats.
 
     Args:
-        ctx: Fully-initialized TgcfContext with client and from_to mappings
+        ctx: Fully-initialized TgcfContext with client and routing_map mappings
     """
     config = ctx.config
     pipeline = ctx.pipeline
 
-    for src, (forward, dest_chats) in ctx.from_to.items():
+    for src, (forward, dest_chats) in ctx.routing_map.items():
         logging.info(f"Forwarding messages from {src} to {dest_chats}")
 
         try:

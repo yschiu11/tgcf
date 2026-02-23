@@ -50,7 +50,7 @@ def make_forward_command_handler(ctx: TgcfContext):
             except Exception as err:
                 logging.error(err)
             ctx.config.forwards.append(forward)
-            ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
+            ctx.routing_map = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
             await cmd_event.respond("Success")
             ctx.save_config()
@@ -88,7 +88,7 @@ def make_remove_command_handler(ctx: TgcfContext):
             payload_dict = yaml.safe_load(payload_text)
             raw_src = payload_dict.get("source")
             ctx.config.forwards = remove_source(raw_src, ctx.config.forwards)
-            ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
+            ctx.routing_map = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
             await cmd_event.respond("Success")
             ctx.save_config()

@@ -98,7 +98,7 @@ async def _run_past_mode(ctx: TgcfContext, session: str | StringSession) -> None
         session, ctx.config.login.api_id, ctx.config.login.api_hash
     ) as client:
         ctx.bind_client(client)
-        ctx.from_to = await resolve_forward_rules(client, ctx.config.forwards)
+        ctx.routing_map = await resolve_forward_rules(client, ctx.config.forwards)
         await forward_job(ctx)
 
 
@@ -130,7 +130,7 @@ async def _run_live_mode(ctx: TgcfContext, session: str | StringSession) -> None
 
     ctx.is_bot = await ctx.client.is_bot()
     ctx.admins = await load_admins(ctx.client, ctx.config.admins)
-    ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
+    ctx.routing_map = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
     await start_sync(ctx)
 
