@@ -32,9 +32,9 @@ class TgcfSender(TgcfPlugin):
             await sender.start()
         self.sender = sender
 
-    async def modify(self, tm: TgcfMessage) -> TgcfMessage:
-        tm.client = self.sender
-        if tm.file_type != FileType.NOFILE:
-            tm.new_file = await tm.get_file()
-            tm.cleanup = True
-        return tm
+    async def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage:
+        wrapped_msg.client = self.sender
+        if wrapped_msg.file_type != FileType.NOFILE:
+            wrapped_msg.new_file = await wrapped_msg.get_file()
+            wrapped_msg.cleanup = True
+        return wrapped_msg

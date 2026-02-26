@@ -20,14 +20,14 @@ class TgcfFilter(TgcfPlugin):
             textf.blacklist = [item.lower() for item in textf.blacklist]
             textf.whitelist = [item.lower() for item in textf.whitelist]
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage | None:
-        if not self.users_safe(tm) or not self.files_safe(tm) or not self.text_safe(tm):
+    def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage | None:
+        if not self.users_safe(wrapped_msg) or not self.files_safe(wrapped_msg) or not self.text_safe(wrapped_msg):
             return None
-        return tm
+        return wrapped_msg
 
-    def text_safe(self, tm: TgcfMessage) -> bool:
+    def text_safe(self, wrapped_msg: TgcfMessage) -> bool:
         flist = self.filters.text
-        text = tm.text or ""
+        text = wrapped_msg.text or ""
 
         if not text and not flist.whitelist:
             return True
@@ -49,9 +49,9 @@ class TgcfFilter(TgcfPlugin):
 
         return False
 
-    def users_safe(self, tm: TgcfMessage) -> bool:
+    def users_safe(self, wrapped_msg: TgcfMessage) -> bool:
         flist = self.filters.users
-        sender = str(tm.sender_id)
+        sender = str(wrapped_msg.sender_id)
         if sender in flist.blacklist:
             return False
         if not flist.whitelist:
@@ -60,9 +60,9 @@ class TgcfFilter(TgcfPlugin):
             return True
         return False
 
-    def files_safe(self, tm: TgcfMessage) -> bool:
+    def files_safe(self, wrapped_msg: TgcfMessage) -> bool:
         flist = self.filters.files
-        fl_type = tm.file_type
+        fl_type = wrapped_msg.file_type
         if fl_type in flist.blacklist:
             return False
         if not flist.whitelist:

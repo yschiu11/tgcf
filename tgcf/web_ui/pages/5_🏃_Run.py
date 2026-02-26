@@ -25,7 +25,7 @@ def termination():
         )
 
     CONFIG = load_config_to_session()
-    CONFIG.pid = 0
+    CONFIG.process_id = 0
     save_session_config(CONFIG)
     st.button("Refresh page")
 
@@ -86,20 +86,20 @@ if check_password(st):
 
     check = False
 
-    if CONFIG.pid == 0:
+    if CONFIG.process_id == 0:
         check = st.button("Run", type="primary")
 
-    if CONFIG.pid != 0:
+    if CONFIG.process_id != 0:
         st.warning(
             "You must click stop and then re-run tgcf to apply changes in config."
         )
         # check if process is running using pid
         try:
-            os.kill(CONFIG.pid, signal.SIGCONT)
+            os.kill(CONFIG.process_id, signal.SIGCONT)
         except Exception as err:
             st.code("The process has stopped.")
             st.code(err)
-            CONFIG.pid = 0
+            CONFIG.process_id = 0
             save_session_config(CONFIG)
             time.sleep(1)
             st.rerun()
@@ -107,11 +107,11 @@ if check_password(st):
         stop = st.button("Stop", type="primary")
         if stop:
             try:
-                os.kill(CONFIG.pid, signal.SIGSTOP)
+                os.kill(CONFIG.process_id, signal.SIGSTOP)
             except Exception as err:
                 st.code(err)
 
-                CONFIG.pid = 0
+                CONFIG.process_id = 0
                 save_session_config(CONFIG)
                 st.button("Refresh Page")
 
@@ -125,7 +125,7 @@ if check_password(st):
                 stdout=logs,
                 stderr=subprocess.STDOUT,
             )
-        CONFIG.pid = process.pid
+        CONFIG.process_id = process.pid
         save_session_config(CONFIG)
         time.sleep(2)
 

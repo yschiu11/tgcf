@@ -76,9 +76,10 @@ class BotMessages(BaseModel):
 
 class Config(BaseModel):
     """The blueprint for tgcf's whole config."""
+    model_config = ConfigDict(populate_by_name=True)
 
     # pylint: disable=too-few-public-
-    pid: int = 0
+    process_id: int = Field(0, alias="pid")
     theme: str = "light"
     login: LoginConfig = LoginConfig()
     admins: List[Union[int, str]] = []
@@ -178,7 +179,7 @@ async def resolve_forward_rules(
         forwards: List of Forward objects
 
     Returns:
-        Dict mapping source chat ID -> (original Forward, resolved dest IDs)
+        Dict mapping src_chat -> (original Forward, resolved dest_chats)
 
     Notes:
     -> The Forward objects may contain username/phn no/links
@@ -193,12 +194,12 @@ async def resolve_forward_rules(
     for forward in forwards:
         if not forward.enabled:
             continue
-        source = forward.source
-        if not isinstance(source, int) and source.strip() == "":
+        raw_src = forward.source
+        if not isinstance(raw_src, int) and raw_src.strip() == "":
             continue
-        src = await resolve_id(forward.source)
-        dests = [await resolve_id(dest) for dest in forward.dest]
-        from_to_dict[src] = (forward, dests)
+        src_chat = await resolve_id(raw_src)
+        dest_chats = [await resolve_id(raw_dest) for raw_dest in forward.dest]
+        from_to_dict[src_chat] = (forward, dest_chats)
     logging.info(f"Loaded {len(from_to_dict)} active forwards")
     return from_to_dict
 

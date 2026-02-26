@@ -51,7 +51,7 @@ def replace(pattern: str, new: str, string: str, regex: bool) -> str:
 
 
 def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
-    """Parse a Telegram post link into (channel, message_id).
+    """Parse a Telegram post link into (channel, src_msg).
 
     Supports:
     - Public: https://t.me/channel_username/123
@@ -61,7 +61,7 @@ def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
         url: Telegram post link.
 
     Returns:
-        Tuple of (channel_identifier, message_id) or None if invalid.
+        Tuple of (channel_identifier, src_msg) or None if invalid.
     """
     # TODO: Confirm link formats
     patterns = [
@@ -75,9 +75,9 @@ def parse_telegram_link(url: str) -> tuple[str | int, int] | None:
         m = re.match(pattern, url)
         if m:
             channel: str | int = m.group(1)
-            msg_id = int(m.group(2))
+            src_msg = int(m.group(2))
             # For private links, convert to proper channel ID format
             if is_private:
                 channel = int(f"-100{channel}")
-            return (channel, msg_id)
+            return (channel, src_msg)
     return None

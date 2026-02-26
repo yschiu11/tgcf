@@ -57,9 +57,9 @@ class TgcfPlugin:
     async def __ainit__(self) -> None:
         """Asynchronous initialization here."""
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage | None:
+    def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage | None:
         """Modify the message here."""
-        return tm
+        return wrapped_msg
 
 
 def load_plugins(plugin_config: PluginConfig) -> dict[str, TgcfPlugin]:
@@ -142,26 +142,26 @@ async def apply_plugins(message: Message, plugin_config: PluginConfig) -> TgcfMe
         message: The Telethon message object
         plugin_config: PluginConfig from Config object
     """
-    tm = TgcfMessage(message)
+    wrapped_msg = TgcfMessage(message)
     plugins = get_plugins(plugin_config)
 
     for _id, plugin in plugins.items():
         try:
             if inspect.iscoroutinefunction(plugin.modify):
-                new_tm = await plugin.modify(tm)
+                new_wrapped_msg = await plugin.modify(wrapped_msg)
             else:
-                new_tm = plugin.modify(tm)
+                new_wrapped_msg = plugin.modify(wrapped_msg)
         except Exception as err:
             logging.error(f"Plugin {_id} failed: {err}. Skipping this plugin.")
             continue
 
         # plugin filters the message
-        if new_tm is None:
+        if new_wrapped_msg is None:
             logging.info(f"Message filtered by plugin {_id}")
-            tm.clear()
+            wrapped_msg.clear()
             return None
 
-        tm = new_tm
+        wrapped_msg = new_wrapped_msg
         logging.info(f"Applied plugin {_id}")
 
-    return tm
+    return wrapped_msg

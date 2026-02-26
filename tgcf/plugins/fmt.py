@@ -11,12 +11,12 @@ class TgcfFmt(TgcfPlugin):
         self.format = data
         logging.info(self.format)
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage:
+    def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage:
         if self.format.style is Style.PRESERVE:
-            return tm
-        msg_text: str = tm.raw_text
+            return wrapped_msg
+        msg_text: str = wrapped_msg.raw_text
         if not msg_text:
-            return tm
+            return wrapped_msg
         style = STYLE_CODES.get(self.format.style)
-        tm.text = f"{style}{msg_text}{style}"
-        return tm
+        wrapped_msg.text = f"{style}{msg_text}{style}"
+        return wrapped_msg

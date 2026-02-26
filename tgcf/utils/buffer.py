@@ -19,10 +19,10 @@ class AlbumBuffer:
         self.messages: list[TgcfMessage] = []
         self.current_group_id: int | None = None
 
-    def add_message(self, tm: TgcfMessage) -> None:
+    def add_message(self, wrapped_msg: TgcfMessage) -> None:
         """Add a message to the current album buffer."""
-        self.messages.append(tm)
-        self.current_group_id = tm.message.grouped_id
+        self.messages.append(wrapped_msg)
+        self.current_group_id = wrapped_msg.message.grouped_id
 
     def should_flush(self, next_grouped_id: int | None) -> bool:
         """Check whether the buffer should be flushed before the next message.
@@ -61,8 +61,8 @@ class AlbumBuffer:
 
     def clear(self) -> None:
         """Clear the buffer and release resources held by each message."""
-        for tm in self.messages:
-            tm.clear()
+        for wrapped_msg in self.messages:
+            wrapped_msg.clear()
         self.messages.clear()
         self.current_group_id = None
 
@@ -74,18 +74,18 @@ class AlbumBuffer:
 async def fetch_album_by_message(
     client: TelegramClient,
     entity: EntityLike,
-    msg_id: int,
+    src_msg: int,
     grouped_id: int,
 ) -> AlbumBuffer:
     """Fetch all messages in an album given one message from it.
 
-    Searches ±ALBUM_SEARCH_RADIUS messages around ``msg_id`` and
+    Searches ±ALBUM_SEARCH_RADIUS messages around ``src_msg`` and
     collects those sharing the same ``grouped_id``.
 
     Args:
         client: Authenticated Telegram client.
         entity: The chat/channel containing the album.
-        msg_id: ID of any message in the album.
+        src_msg: ID of any message in the album.
         grouped_id: The album's grouped_id.
 
     Returns:
@@ -96,7 +96,7 @@ async def fetch_album_by_message(
     # Fetch nearby messages to find all album members
     messages = await client.get_messages(
         entity,
-        ids=range(msg_id - ALBUM_SEARCH_RADIUS, msg_id + ALBUM_SEARCH_RADIUS + 1),
+        ids=range(src_msg - ALBUM_SEARCH_RADIUS, src_msg + ALBUM_SEARCH_RADIUS + 1),
     )
 
     # Filter and wrap in TgcfMessage

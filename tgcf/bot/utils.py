@@ -13,20 +13,20 @@ def make_admin_protect(ctx):
     def admin_protect(org_func):
         """Decorate to restrict non admins from accessing the bot."""
 
-        async def wrapper_func(event):
+        async def wrapper_func(cmd_event):
             """Wrap the original function."""
             logging.info(f"Applying admin protection! Admins are {ctx.admins}")
-            if event.sender_id not in ctx.admins:
-                await event.respond("You are not authorized.")
+            if cmd_event.sender_id not in ctx.admins:
+                await cmd_event.respond("You are not authorized.")
                 raise events.StopPropagation
-            return await org_func(event)
+            return await org_func(cmd_event)
 
         return wrapper_func
 
     return admin_protect
 
 
-def get_args(text: str) -> str:
+def get_cmd_payload(text: str) -> str:
     """Return the part of message following the command."""
     splitted = text.split(" ", 1)
 
@@ -35,10 +35,10 @@ def get_args(text: str) -> str:
         if not len(splitted) == 2:
             return ""
 
-    prefix, args = splitted
-    args = args.strip()
-    logging.info(f"Got command {prefix} with args {args}")
-    return args
+    prefix, payload_text = splitted
+    payload_text = payload_text.strip()
+    logging.info(f"Got command {prefix} with payload: {payload_text}")
+    return payload_text
 
 
 def display_forwards(forwards: List[Forward]) -> str:
@@ -55,10 +55,10 @@ def display_forwards(forwards: List[Forward]) -> str:
     return forward_str
 
 
-def remove_source(source, forwards: List[Forward]) -> List[Forward]:
+def remove_source(raw_src, forwards: List[Forward]) -> List[Forward]:
     """Remove a source from forwards."""
     for i, forward in enumerate(forwards):
-        if forward.source == source:
+        if forward.source == raw_src:
             del forwards[i]
             return forwards
     raise ValueError("The source does not exist")

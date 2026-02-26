@@ -36,10 +36,10 @@ class TgcfMark(TgcfPlugin):
     def __init__(self, data) -> None:
         self.data = data
 
-    async def modify(self, tm: TgcfMessage) -> TgcfMessage:
-        if tm.file_type not in [FileType.GIF, FileType.VIDEO, FileType.PHOTO]:
-            return tm
-        downloaded_file = await tm.get_file()
+    async def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage:
+        if wrapped_msg.file_type not in [FileType.GIF, FileType.VIDEO, FileType.PHOTO]:
+            return wrapped_msg
+        downloaded_file = await wrapped_msg.get_file()
         base = File(downloaded_file)
         if self.data.image.startswith("https://"):
             download_image(self.data.image)
@@ -47,7 +47,7 @@ class TgcfMark(TgcfPlugin):
         else:
             overlay = File(self.data.image)
         wtm = Watermark(overlay, self.data.position)
-        tm.new_file = apply_watermark(base, wtm, frame_rate=self.data.frame_rate)
+        wrapped_msg.new_file = apply_watermark(base, wtm, frame_rate=self.data.frame_rate)
         cleanup(downloaded_file)
-        tm.cleanup = True
-        return tm
+        wrapped_msg.cleanup = True
+        return wrapped_msg

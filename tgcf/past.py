@@ -18,13 +18,13 @@ async def forward_job(ctx: TgcfContext) -> None:
     Forward all existing messages in the concerned chats.
 
     Args:
-        ctx: Fully-initialized TgcfContext with client and from_to mappings
+        ctx: Fully-initialized TgcfContext with client and routing_map mappings
     """
     config = ctx.config
     pipeline = ctx.pipeline
 
-    for src, (forward, dests) in ctx.from_to.items():
-        logging.info(f"Forwarding messages from {src} to {dests}")
+    for src, (forward, dest_chats) in ctx.routing_map.items():
+        logging.info(f"Forwarding messages from {src} to {dest_chats}")
 
         try:
             last_id = forward.offset
@@ -34,7 +34,7 @@ async def forward_job(ctx: TgcfContext) -> None:
                 if forward.end and message.id > forward.end:
                     break
 
-                packet = MessagePacket(message, src, dests)
+                packet = MessagePacket(message, src, dest_chats)
 
                 try:
                     await pipeline.handle_message(packet)
@@ -47,9 +47,9 @@ async def forward_job(ctx: TgcfContext) -> None:
                     await asyncio.sleep(config.past.delay)
                     logging.info(f"Slept for {config.past.delay} seconds")
 
-                except FloodWaitError as fwe:
-                    logging.info(f"Sleeping for {fwe}")
-                    await asyncio.sleep(delay=fwe.seconds)
+                except FloodWaitError as wait_err:
+                    logging.info(f"Sleeping for {wait_err}")
+                    await asyncio.sleep(delay=wait_err.seconds)
                 except Exception as err:
                     logging.exception(err)
 
@@ -57,5 +57,5 @@ async def forward_job(ctx: TgcfContext) -> None:
             forward.offset = last_id
 
         finally:
-            logging.info(f"Completed forwarding from {src} to {dests}")
+            logging.info(f"Completed forwarding from {src} to {dest_chats}")
             ctx.save_config()

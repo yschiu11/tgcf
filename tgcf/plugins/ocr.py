@@ -12,12 +12,12 @@ class TgcfOcr(TgcfPlugin):
     def __init__(self, data) -> None:
         pass
 
-    async def modify(self, tm: TgcfMessage) -> TgcfMessage:
+    async def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage:
 
-        if tm.file_type != FileType.PHOTO:
-            return tm
+        if wrapped_msg.file_type != FileType.PHOTO:
+            return wrapped_msg
 
-        file = await tm.get_file()
-        tm.text = pytesseract.image_to_string(Image.open(file))
+        file = await wrapped_msg.get_file()
+        wrapped_msg.text = pytesseract.image_to_string(Image.open(file))
         cleanup(file)
-        return tm
+        return wrapped_msg

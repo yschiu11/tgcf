@@ -11,11 +11,11 @@ class TgcfReplace(TgcfPlugin):
         self.replace = data
         logging.info(self.replace)
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage:
-        msg_text: str = tm.text
+    def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage:
+        msg_text: str = wrapped_msg.text
         if not msg_text:
-            return tm
+            return wrapped_msg
         for original, new in self.replace.text.items():
             msg_text = replace(original, new, msg_text, self.replace.regex)
-        tm.text = msg_text
-        return tm
+        wrapped_msg.text = msg_text
+        return wrapped_msg

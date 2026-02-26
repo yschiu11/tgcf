@@ -12,56 +12,56 @@ from tgcf.context import TgcfContext
 from tgcf.pipeline import MessagePacket, PipelineStatus
 
 
-async def _schedule_album_flush(ctx: TgcfContext, chat_id: int) -> None:
+async def _schedule_album_flush(ctx: TgcfContext, src_chat: int) -> None:
     """Schedule or reschedule the album flush timeout for a chat."""
     timeout = ctx.config.live.album_flush_timeout
 
     # Cancel existing flush task if any
-    if chat_id in ctx.flush_tasks:
-        ctx.flush_tasks[chat_id].cancel()
+    if src_chat in ctx.flush_tasks:
+        ctx.flush_tasks[src_chat].cancel()
 
     # Schedule new flush task
     async def _timeout_wrapper():
         try:
             await asyncio.sleep(timeout)
-            await ctx.pipeline.flush(chat_id)
+            await ctx.pipeline.flush(src_chat)
         except asyncio.CancelledError:
-            logging.debug(f"Flush cancelled for chat {chat_id}")
+            logging.debug(f"Flush cancelled for chat {src_chat}")
             raise
         finally:
-            if ctx.flush_tasks.get(chat_id) == asyncio.current_task():
-                del ctx.flush_tasks[chat_id]
+            if ctx.flush_tasks.get(src_chat) == asyncio.current_task():
+                del ctx.flush_tasks[src_chat]
 
-    ctx.flush_tasks[chat_id] = asyncio.create_task(_timeout_wrapper())
+    ctx.flush_tasks[src_chat] = asyncio.create_task(_timeout_wrapper())
 
 
 def make_new_message_handler(ctx: TgcfContext):
     """Factory that creates a new message handler with context closure."""
 
-    async def handler(event: Message | events.NewMessage) -> None:
+    async def handler(new_msg_event: Message | events.NewMessage) -> None:
         """Process new incoming messages with album buffering support."""
-        chat_id = event.chat_id
+        src_chat = new_msg_event.chat_id
 
-        if chat_id not in ctx.from_to:
+        if src_chat not in ctx.routing_map:
             return
-        logging.info(f"New message received in {chat_id}")
+        logging.info(f"New message received in {src_chat}")
 
-        _, dest = ctx.from_to[chat_id]
+        _, dest_chats = ctx.routing_map[src_chat]
 
         packet = MessagePacket(
-            raw_message=event.message,
-            source_chat_id=chat_id,
-            dest_chat_ids=dest
+            raw_message=new_msg_event.message,
+            src_chat=src_chat,
+            dest_chats=dest_chats
         )
 
         result = await ctx.pipeline.handle_message(packet)
 
-        if result.did_flush and chat_id in ctx.flush_tasks:
-            ctx.flush_tasks[chat_id].cancel()
-            del ctx.flush_tasks[chat_id]
+        if result.did_flush and src_chat in ctx.flush_tasks:
+            ctx.flush_tasks[src_chat].cancel()
+            del ctx.flush_tasks[src_chat]
 
         if result.status == PipelineStatus.BUFFERED:
-            await _schedule_album_flush(ctx, chat_id)
+            await _schedule_album_flush(ctx, src_chat)
 
     return handler
 
@@ -69,20 +69,20 @@ def make_new_message_handler(ctx: TgcfContext):
 def make_edited_message_handler(ctx: TgcfContext):
     """Factory that creates an edited message handler with context closure."""
 
-    async def handler(event) -> None:
+    async def handler(edit_msg_event) -> None:
         """Handle message edits."""
-        chat_id = event.chat_id
+        src_chat = edit_msg_event.chat_id
 
-        if chat_id not in ctx.from_to:
+        if src_chat not in ctx.routing_map:
             return
 
-        logging.info(f"Message edited in {chat_id}")
-        _, dest = ctx.from_to[chat_id]
+        logging.info(f"Message edited in {src_chat}")
+        _, dest_chats = ctx.routing_map[src_chat]
 
         packet = MessagePacket(
-            raw_message=event.message,
-            source_chat_id=chat_id,
-            dest_chat_ids=dest
+            raw_message=edit_msg_event.message,
+            src_chat=src_chat,
+            dest_chats=dest_chats
         )
 
         await ctx.pipeline.handle_edit(packet)
@@ -93,24 +93,24 @@ def make_edited_message_handler(ctx: TgcfContext):
 def make_deleted_message_handler(ctx: TgcfContext):
     """Factory that creates a deleted message handler with context closure."""
 
-    async def handler(event) -> None:
+    async def handler(del_msg_event) -> None:
         """Handle message deletes."""
-        chat_id = event.chat_id
-        if chat_id not in ctx.from_to:
+        src_chat = del_msg_event.chat_id
+        if src_chat not in ctx.routing_map:
             return
 
-        logging.info(f"Message deleted in {chat_id}")
+        logging.info(f"Message deleted in {src_chat}")
 
         # Telethon's MessageDeleted can have .deleted_ids (list) or .deleted_id (int)
-        ids = getattr(event, "deleted_ids", None) or [getattr(event, "deleted_id", None)]
+        deleted_ids = getattr(del_msg_event, "deleted_ids", None) or [getattr(del_msg_event, "deleted_id", None)]
 
         # Filter for valid integers only
-        ids = [i for i in ids if isinstance(i, int)]
+        deleted_msgs = [i for i in deleted_ids if isinstance(i, int)]
 
-        if not ids:
+        if not deleted_msgs:
             return
 
-        await ctx.pipeline.handle_delete(chat_id, ids)
+        await ctx.pipeline.handle_delete(src_chat, deleted_msgs)
 
     return handler
 
@@ -128,7 +128,7 @@ async def start_sync(ctx: TgcfContext) -> None:
     """Start tgcf live sync.
 
     Args:
-        ctx: Fully-initialized TgcfContext with client, from_to, and admins
+        ctx: Fully-initialized TgcfContext with client, routing_map, and admins
     """
     config = ctx.config
     logging.info(f"ctx.is_bot={ctx.is_bot}")

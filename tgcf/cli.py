@@ -98,7 +98,7 @@ async def _run_past_mode(ctx: TgcfContext, session: str | StringSession) -> None
         session, ctx.config.login.api_id, ctx.config.login.api_hash
     ) as client:
         ctx.bind_client(client)
-        ctx.from_to = await resolve_forward_rules(client, ctx.config.forwards)
+        ctx.routing_map = await resolve_forward_rules(client, ctx.config.forwards)
         await forward_job(ctx)
 
 
@@ -130,7 +130,7 @@ async def _run_live_mode(ctx: TgcfContext, session: str | StringSession) -> None
 
     ctx.is_bot = await ctx.client.is_bot()
     ctx.admins = await load_admins(ctx.client, ctx.config.admins)
-    ctx.from_to = await resolve_forward_rules(ctx.client, ctx.config.forwards)
+    ctx.routing_map = await resolve_forward_rules(ctx.client, ctx.config.forwards)
 
     await start_sync(ctx)
 
@@ -187,7 +187,7 @@ def main(
 @app.command()
 def link(
     url: str = typer.Argument(..., help="Telegram post link (e.g., https://t.me/channel/123)"),
-    dest: list[str] = typer.Option(
+    raw_dests: list[str] = typer.Option(
         ..., "--dest", "-d", help="Destination chat ID or username (can specify multiple)"
     ),
     verbose: bool | None = typer.Option(
@@ -210,4 +210,4 @@ def link(
     """
     config_path = _load_env_and_config_path()
 
-    asyncio.run(forward_link_job(url, dest, config_path))
+    asyncio.run(forward_link_job(url, raw_dests, config_path))

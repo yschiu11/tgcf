@@ -10,6 +10,6 @@ class TgcfCaption(TgcfPlugin):
         self.caption = data
         logging.info(self.caption)
 
-    def modify(self, tm: TgcfMessage) -> TgcfMessage:
-        tm.text = f"{self.caption.header}{tm.text or ''}{self.caption.footer}"
-        return tm
+    def modify(self, wrapped_msg: TgcfMessage) -> TgcfMessage:
+        wrapped_msg.text = f"{self.caption.header}{wrapped_msg.text or ''}{self.caption.footer}"
+        return wrapped_msg
