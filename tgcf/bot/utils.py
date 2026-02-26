@@ -1,6 +1,5 @@
 """helper functions for the bot."""
 import logging
-from typing import List
 
 from telethon import events
 
@@ -41,7 +40,7 @@ def get_cmd_payload(text: str) -> str:
     return payload_text
 
 
-def display_forwards(forwards: List[Forward]) -> str:
+def display_forwards(forwards: list[Forward]) -> str:
     """Return a string that beautifully displays all current forwards."""
     if len(forwards) == 0:
         return "Currently no forwards are set"
@@ -55,7 +54,7 @@ def display_forwards(forwards: List[Forward]) -> str:
     return forward_str
 
 
-def remove_source(raw_src, forwards: List[Forward]) -> List[Forward]:
+def remove_source(raw_src, forwards: list[Forward]) -> list[Forward]:
     """Remove a source from forwards."""
     for i, forward in enumerate(forwards):
         if forward.source == raw_src:

@@ -1,5 +1,4 @@
 from enum import Enum
-from typing import Dict, List
 
 from pydantic import BaseModel, ConfigDict, Field
 from watermark import Position
@@ -18,13 +17,13 @@ class FileType(str, Enum):
 
 
 class FilterList(BaseModel):
-    blacklist: List[str] = []
-    whitelist: List[str] = []
+    blacklist: list[str] = []
+    whitelist: list[str] = []
 
 
 class FilesFilterList(BaseModel):
-    blacklist: List[FileType] = []
-    whitelist: List[FileType] = []
+    blacklist: list[FileType] = []
+    whitelist: list[FileType] = []
 
 
 class TextFilter(FilterList):
@@ -81,7 +80,7 @@ class Replace(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     enabled: bool = Field(False, alias="check")
-    text: Dict[str, str] = {}
+    text: dict[str, str] = {}
     text_raw: str = ""
     regex: bool = False
 

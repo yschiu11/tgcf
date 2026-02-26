@@ -1,5 +1,4 @@
 import os
-from typing import Dict, List
 
 import streamlit as st
 from streamlit.components.v1 import html
@@ -37,21 +36,21 @@ def get_list(string: str):
     return my_list
 
 
-def get_string(my_list: List):
+def get_string(my_list: list):
     string = ""
     for item in my_list:
         string += f"{item}\n"
     return string
 
 
-def dict_to_list(dict: Dict):
+def dict_to_list(dict_obj: dict):
     my_list = []
-    for key, val in dict.items():
+    for key, val in dict_obj.items():
         my_list.append(f"{key}: {val}")
     return my_list
 
 
-def list_to_dict(my_list: List):
+def list_to_dict(my_list: list):
     my_dict = {}
     for item in my_list:
         key, val = item.split(":")

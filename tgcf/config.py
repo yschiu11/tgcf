@@ -3,7 +3,7 @@
 import logging
 import os
 import tempfile
-from typing import Dict, List, Optional, Union
+from typing import Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
@@ -82,8 +82,8 @@ class Config(BaseModel):
     process_id: int = Field(0, alias="pid")
     theme: str = "light"
     login: LoginConfig = LoginConfig()
-    admins: List[Union[int, str]] = []
-    forwards: List[Forward] = []
+    admins: list[Union[int, str]] = []
+    forwards: list[Forward] = []
     show_forwarded_from: bool = False # Show 'Forwarded from' in forwarded messages
     reply_chain: bool = False  # Forward reply chains from source to destination
     mode: int = 0  # 0: live, 1:past
@@ -170,8 +170,8 @@ async def get_id(client: TelegramClient, peer):
 
 
 async def resolve_forward_rules(
-    client: TelegramClient, forwards: List[Forward]
-) -> Dict[int, tuple[Forward, list[int]]]:
+    client: TelegramClient, forwards: list[Forward]
+) -> dict[int, tuple[Forward, list[int]]]:
     """Convert Forward objects to a mapping with resolved IDs.
 
     Args:
@@ -186,7 +186,7 @@ async def resolve_forward_rules(
     -> But this mapping strictly contains signed integer chat ids
     -> The Forward reference is preserved for offset tracking in past mode
     """
-    from_to_dict: Dict[int, tuple[Forward, list[int]]] = {}
+    from_to_dict: dict[int, tuple[Forward, list[int]]] = {}
 
     async def resolve_id(peer):
         return await get_id(client, peer)
