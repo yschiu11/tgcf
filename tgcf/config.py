@@ -3,6 +3,7 @@
 import logging
 import os
 import tempfile
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
@@ -102,7 +103,7 @@ def write_config(config: Config, path: str = CONFIG_FILE_NAME) -> None:
     """
     data = config.model_dump_json()
 
-    dir_name = os.path.dirname(path) or "."
+    dir_name = Path(path).parent
     with tempfile.NamedTemporaryFile(
         mode="w",
         encoding="utf8",
@@ -123,7 +124,7 @@ def ensure_config_exists(path: str = CONFIG_FILE_NAME) -> None:
     Args:
         path: File path to check/create (defaults to CONFIG_FILE_NAME)
     """
-    if os.path.exists(path):
+    if Path(path).exists():
         logging.info(f"{path} detected!")
         return
 

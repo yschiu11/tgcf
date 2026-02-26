@@ -5,6 +5,7 @@ import logging
 import os
 import sys
 from enum import Enum
+from pathlib import Path
 
 import typer
 from dotenv import load_dotenv
@@ -35,8 +36,8 @@ console = Console()
 
 def _load_env_and_config_path() -> str:
     """Load .env from CWD and return the resolved config file path."""
-    env_path = os.path.join(os.getcwd(), ".env")
-    load_dotenv(env_path)
+    env_path = Path.cwd() / ".env"
+    load_dotenv(str(env_path))
     return os.getenv(CONFIG_ENV_VAR_NAME, CONFIG_FILE_NAME)
 
 

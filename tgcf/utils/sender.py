@@ -3,7 +3,7 @@ from __future__ import annotations
 """Telegram message sending, forwarding, and fallback logic."""
 
 import logging
-import os
+from pathlib import Path
 
 from telethon.client import TelegramClient
 from telethon.hints import EntityLike
@@ -318,8 +318,8 @@ async def send_single_message_with_fallback(
         await client.send_file(dest_chat, file_path, caption=message.text)
         logging.info(f"Sent message to {dest_chat} (via download+reupload)")
     finally:
-        if file_path and os.path.exists(file_path):
-            os.remove(file_path)
+        if file_path:
+            Path(file_path).unlink(missing_ok=True)
             logging.info(f"Cleaned up temp file: {file_path}")
 
 
@@ -375,9 +375,8 @@ async def send_album_with_fallback(
                 logging.error(f"Failed to send album via fallback to {dest_chat}: {err}")
     finally:
         for file_path in downloaded_files:
-            if os.path.exists(file_path):
-                os.remove(file_path)
-                logging.info(f"Cleaned up: {file_path}")
+            Path(file_path).unlink(missing_ok=True)
+            logging.info(f"Cleaned up: {file_path}")
 
 
 async def resolve_dest_ids(
