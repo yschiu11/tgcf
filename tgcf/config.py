@@ -3,7 +3,6 @@
 import logging
 import os
 import tempfile
-from typing import Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
@@ -27,10 +26,10 @@ class Forward(BaseModel):
 
     config_name: str = Field("", alias="con_name")
     enabled: bool = Field(True, alias="use_this")
-    source: Union[int, str] = ""
-    dest: List[Union[int, str]] = []
+    source: int | str = ""
+    dest: list[int | str] = []
     offset: int = 0
-    end: Optional[int] = 0
+    end: int | None = 0
 
 
 class LiveSettings(BaseModel):
@@ -39,7 +38,7 @@ class LiveSettings(BaseModel):
     # pylint: disable=too-few-public-methods
     sequential_updates: bool = False
     delete_sync: bool = False
-    delete_on_edit: Optional[str] = ".deleteMe"
+    delete_on_edit: str | None = ".deleteMe"
     album_flush_timeout: float = 0.6  # Seconds to wait after last album message before forwarding
 
 
@@ -82,7 +81,7 @@ class Config(BaseModel):
     process_id: int = Field(0, alias="pid")
     theme: str = "light"
     login: LoginConfig = LoginConfig()
-    admins: list[Union[int, str]] = []
+    admins: list[int | str] = []
     forwards: list[Forward] = []
     show_forwarded_from: bool = False # Show 'Forwarded from' in forwarded messages
     reply_chain: bool = False  # Forward reply chains from source to destination
