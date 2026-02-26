@@ -51,7 +51,7 @@ class TgcfMessage:
 class TgcfPlugin:
     id_ = "plugin"
 
-    def __init__(self, data: dict[str, Any]) -> None:  # TODO data type has changed
+    def __init__(self, data: Any) -> None:
         self.data = data
 
     async def __ainit__(self) -> None:
