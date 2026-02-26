@@ -76,9 +76,10 @@ class BotMessages(BaseModel):
 
 class Config(BaseModel):
     """The blueprint for tgcf's whole config."""
+    model_config = ConfigDict(populate_by_name=True)
 
     # pylint: disable=too-few-public-
-    process_id: int = 0
+    process_id: int = Field(0, alias="pid")
     theme: str = "light"
     login: LoginConfig = LoginConfig()
     admins: List[Union[int, str]] = []

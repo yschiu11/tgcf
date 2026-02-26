@@ -254,8 +254,6 @@ async def forward_single_message(
         config: Global forwarding configuration.
         history_map: Forward map updated with sent message IDs.
     """
-    # If the message handles replies, look up the forwarded reply-to ID
-    reply_to = None
     src_uid = (wrapped_msg.message.chat_id, wrapped_msg.message.id)
     if src_uid not in history_map:
         history_map[src_uid] = {}

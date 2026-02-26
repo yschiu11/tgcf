@@ -54,7 +54,7 @@ class PipelineStatus(Enum):
 @dataclass
 class PipelineResult:
     status: PipelineStatus
-    dest_chats: list[int] = None
+    dest_chats: list[int] | None = None
     did_flush: bool = False  # True if an album was flushed
 
 
