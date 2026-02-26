@@ -7,7 +7,7 @@ Contains all the first-party tgcf plugins.
 import inspect
 import logging
 from importlib import import_module
-from typing import Any, Dict
+from typing import Any
 
 from telethon.tl.custom.message import Message
 
@@ -51,7 +51,7 @@ class TgcfMessage:
 class TgcfPlugin:
     id_ = "plugin"
 
-    def __init__(self, data: Dict[str, Any]) -> None:  # TODO data type has changed
+    def __init__(self, data: Any) -> None:
         self.data = data
 
     async def __ainit__(self) -> None:
