@@ -159,5 +159,6 @@ Here are some guides for deployment to different cloud providers.
 PRs are most welcome! Read the [contributing guidelines](/.github/CONTRIBUTING.md)
 to get started.
 
-If you are not a developer, you may also contribute financially to
-incentivise the development of any custom feature you need.
+MIT License.
+Copyright (c) 2025 YuanSheng Chiu
+Copyright (c) 2020 Aahnik Daw

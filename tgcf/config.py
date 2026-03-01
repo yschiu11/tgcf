@@ -71,7 +71,7 @@ class LoginConfig(BaseModel):
 
 class BotMessages(BaseModel):
     start: str = "Hi! I am alive"
-    bot_help: str = "For details visit github.com/aahnik/tgcf"
+    bot_help: str = "For details visit github.com/yschiu11/tgcf"
 
 
 class Config(BaseModel):
