@@ -8,8 +8,6 @@ list:
 # required for list
 no_targets__:
 
-VERSION=$$(poetry version -s)
-
 clean:
 	@rm -rf build dist .eggs *.egg-info
 	@rm -rf .benchmarks .coverage coverage.xml htmlcov report.xml .tox
@@ -24,22 +22,3 @@ fmt: clean
 
 hard-clean: clean
 	@rm -rf .venv
-
-ver:
-	@echo tgcf $(VERSION)
-
-pypi:
-	@poetry publish --build
-
-docker:
-	@docker build -t tgcf .
-	@docker tag tgcf aahnik/tgcf:latest
-	@docker tag tgcf aahnik/tgcf:$(VERSION)
-
-docker-release: docker
-	@docker push -a aahnik/tgcf
-
-docker-run:
-	@docker run -d -p 8501:8501 --env-file .env aahnik/tgcf
-
-release: pypi docker-release

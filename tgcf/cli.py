@@ -15,7 +15,7 @@ from rich.logging import RichHandler
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
-from tgcf import __version__
+
 from tgcf.config import (
     ensure_config_exists,
     get_session,
@@ -68,14 +68,6 @@ def configure_logging(value: bool | None):
     )
     if value:
         logging.info("Verbosity turned on! This is suitable for debugging")
-
-
-def version_callback(value: bool | None):
-    """Show current version and exit."""
-
-    if value:
-        console.print(__version__)
-        raise typer.Exit()
 
 
 async def _run_past_mode(ctx: TgcfContext, session: str | StringSession) -> None:
@@ -164,19 +156,10 @@ def main(
         envvar="LOUD",
         help="Increase output verbosity.",
     ),
-    version: bool | None = typer.Option(  # pylint: disable=unused-argument
-        None,
-        "--version",
-        "-v",
-        callback=version_callback,
-        help="Show version and exit.",
-    ),
 ):
     """The ultimate tool to automate custom telegram message forwarding.
 
-    Source Code: https://github.com/aahnik/tgcf
-
-    For updates join telegram channel @aahniks_code
+    Source Code: https://github.com/yschiu11/tgcf
 
     To run web interface run `tgcf-web` command.
     """

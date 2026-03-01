@@ -152,7 +152,7 @@ if check_password(st):
                     'orginal': 'new'
 
                     ```
-                - View [docs](https://github.com/aahnik/tgcf/wiki/Replace-Plugin) for advanced usage."""
+                - View [docs](https://github.com/yschiu11/tgcf/tree/main/docs/Replace-Plugin) for advanced usage."""
             )
 
     with st.expander("Caption"):
@@ -191,24 +191,13 @@ if check_password(st):
                 st.markdown(
                 """
                 ###### How to get session string?
-
-                Link to repl: https://replit.com/@aahnik/tg-login?v=1
                 
-                <p style="line-height:0px;margin-bottom:2em">
-                    <i>Click on the above link and enter api id, api hash, and phone no to generate session string.</i>
-                </p>
-                
-                
-                > <small>**Note from developer:**<small>
-                >
-                > <small>Due some issues logging in with a user account using a phone no is not supported in this web interface.</small>
-                >
-                > <small>I have built a command-line program named tg-login (https://github.com/aahnik/tg-login) that can generate the session string for you.</small>
-                >
-                > <small>You can run tg-login on your computer, or securely in this repl. tg-login is open source, and you can also inspect the bash script running in the repl.</small>
-                >
-                > <small>What is a session string?</small>
-                > <small>https://docs.telethon.dev/en/stable/concepts/sessions.html#string-sessions</small>
+                Run securely on your own machine:
+                ```bash
+                pip install tg-login
+                tg-login
+                ```
+                Follow the prompts to generate your session string, then paste it above.
                 """
                 ,unsafe_allow_html=True)
 
