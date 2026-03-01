@@ -41,23 +41,13 @@ if check_password(st):
         with st.expander("How to get session string ?"):
             st.markdown(
                 """
-
-            Link to repl: https://replit.com/@aahnik/tg-login?v=1
-
-            _Click on the above link and enter api id, api hash, and phone no to generate session string._
-
-            **Note from developer:**
-
-            Due some issues logging in with a user account using a phone no is not supported in this web interface.
-
-            I have built a command-line program named tg-login (https://github.com/aahnik/tg-login) that can generate the session string for you.
-
-            You can run tg-login on your computer, or securely in this repl. tg-login is open source, and you can also inspect the bash script running in the repl.
-
-            What is a session string ?
-            https://docs.telethon.dev/en/stable/concepts/sessions.html#string-sessions
-
-            """
+                To run securely on your machine:
+                ```bash
+                pip install tg-login
+                tg-login
+                ```
+                Follow the prompts to generate your session string, then paste it above.
+                """
             )
 
     if st.button("Save"):
