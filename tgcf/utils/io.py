@@ -7,13 +7,12 @@ import re
 import sys
 from datetime import datetime
 
-from tgcf import __version__
 
 
 def platform_info() -> str:
     """Return a multi-line string describing the runtime environment."""
     nl = "\n"
-    return f"""Running tgcf {__version__}\
+    return f"""Running tgcf\
     \nPython {sys.version.replace(nl, "")}\
     \nOS {os.name}\
     \nPlatform {platform.system()} {platform.release()}\
