@@ -25,7 +25,7 @@ Replace text with an empty string to strip it completely from messages.
 ### Regular Expressions
 If regex features are enabled in the plugin settings, you can perform advanced matching (e.g., stripping URLs):
 ```yaml
-'(@|www|http?)\S+': ''
+'(@|www|https?)\S+': ''
 ```
 *Tip: Use single quotes to encapsulate regex strings to prevent YAML parsing errors with special characters.*
 
@@ -45,5 +45,5 @@ Alternatively, use standard markdown wrappers in the replacement value:
 Supported format wrappers:
 - `bold`: `**`
 - `italics`: `__`
-- `code`: ` \` `
+- `code`: `` ` ``
 - `strike`: `~~`

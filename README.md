@@ -47,7 +47,7 @@ Now open your browser, log in, configure your pipelines, and let it run.
 
 ## Getting Help
 
-- **Documentation:** [Read the Wiki](https://github.com/yschiu11/tgcf/tree/main/docs)
+- **Documentation:** [Read the Docs](https://github.com/yschiu11/tgcf/tree/main/docs)
 - **Visual Guides:** [Video Tutorials](https://www.youtube.com/channel/UCcEbN0d8iLTB6ZWBE_IDugg)
 
 If the software fails or you encounter legitimate bugs, report them on the [Issue Tracker](https://github.com/yschiu11/tgcf/issues/new).
