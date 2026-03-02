@@ -20,12 +20,12 @@ class FileType(str, Enum):
     NOFILE = "nofile"
 
 
-class FilterList(BaseModel):
+class FilterList(TgcfModel):
     blacklist: list[str] = []
     whitelist: list[str] = []
 
 
-class FilesFilterList(BaseModel):
+class FilesFilterList(TgcfModel):
     blacklist: list[FileType] = []
     whitelist: list[FileType] = []
 
@@ -49,64 +49,48 @@ STYLE_CODES = {"bold": "**", "italics": "__", "code": "`", "strike": "~~", "plai
 # define plugin configs
 
 
-class Filters(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class Filters(TgcfModel):
     enabled: bool = Field(False, alias="check")
     users: FilterList = FilterList()
     files: FilesFilterList = FilesFilterList()
     text: TextFilter = TextFilter()
 
 
-class Format(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class Format(TgcfModel):
     enabled: bool = Field(False, alias="check")
     style: Style = Style.PRESERVE
 
 
-class MarkConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class MarkConfig(TgcfModel):
     enabled: bool = Field(False, alias="check")
     image: str = "image.png"
     position: Position = Position.centre
     frame_rate: int = 15
 
 
-class OcrConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class OcrConfig(TgcfModel):
     enabled: bool = Field(False, alias="check")
 
 
-class Replace(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class Replace(TgcfModel):
     enabled: bool = Field(False, alias="check")
     text: dict[str, str] = {}
     text_raw: str = ""
     regex: bool = False
 
 
-class Caption(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class Caption(TgcfModel):
     enabled: bool = Field(False, alias="check")
     header: str = ""
     footer: str = ""
 
-class Sender(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class Sender(TgcfModel):
     enabled: bool = Field(False, alias="check")
     user_type: int = 0  # 0:bot, 1:user
     bot_token: str = Field("", alias="BOT_TOKEN")
     session_string: str = Field("", alias="SESSION_STRING")
 
-class PluginConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
-
+class PluginConfig(TgcfModel):
     filter: Filters = Filters()
     format: Format = Field(Format(), alias="fmt")
     mark: MarkConfig = MarkConfig()

@@ -126,7 +126,7 @@ def make_style_command_handler(ctx: TgcfContext):
             _valid = [item.value for item in Style]
             if payload_text not in _valid:
                 raise ValueError(f"Invalid style. Choose from {_valid}")
-            ctx.config.plugins.fmt.style = payload_text
+            ctx.config.plugins.format.style = payload_text
             await cmd_event.respond("Success")
             ctx.save_config()
         except ValueError as err:
