@@ -5,13 +5,13 @@ import os
 import tempfile
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator  # pylint: disable=no-name-in-module
+from pydantic import Field, field_validator  # pylint: disable=no-name-in-module
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 from telethon.utils import get_peer_id
 
 from tgcf.const import CONFIG_FILE_NAME
-from tgcf.plugin_models import PluginConfig
+from tgcf.plugin_models import PluginConfig, TgcfModel
 
 
 class ConfigurationError(Exception):
@@ -19,11 +19,10 @@ class ConfigurationError(Exception):
     pass
 
 
-class Forward(BaseModel):
+class Forward(TgcfModel):
     """Blueprint for the forward object."""
 
     # pylint: disable=too-few-public-methods
-    model_config = ConfigDict(populate_by_name=True)
 
     config_name: str = Field("", alias="con_name")
     enabled: bool = Field(True, alias="use_this")
@@ -33,20 +32,22 @@ class Forward(BaseModel):
     end: int | None = 0
 
 
-class LiveSettings(BaseModel):
+class LiveSettings(TgcfModel):
     """Settings to configure how tgcf operates in live mode."""
 
     # pylint: disable=too-few-public-methods
+
     sequential_updates: bool = False
     delete_sync: bool = False
     delete_on_edit: str | None = ".deleteMe"
     album_flush_timeout: float = 0.6  # Seconds to wait after last album message before forwarding
 
 
-class PastSettings(BaseModel):
+class PastSettings(TgcfModel):
     """Configuration for past mode."""
 
     # pylint: disable=too-few-public-methods
+
     delay: int = 0
 
     @field_validator("delay")
@@ -57,8 +58,7 @@ class PastSettings(BaseModel):
         return val
 
 
-class LoginConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True)
+class LoginConfig(TgcfModel):
 
     api_id: int = Field(0, alias="API_ID")
     api_hash: str = Field("", alias="API_HASH")
@@ -69,14 +69,14 @@ class LoginConfig(BaseModel):
     bot_token: str = Field("", alias="BOT_TOKEN")
 
 
-class BotMessages(BaseModel):
+class BotMessages(TgcfModel):
+
     start: str = "Hi! I am alive"
     bot_help: str = "For details visit https://github.com/yschiu11/tgcf"
 
 
-class Config(BaseModel):
+class Config(TgcfModel):
     """The blueprint for tgcf's whole config."""
-    model_config = ConfigDict(populate_by_name=True)
 
     # pylint: disable=too-few-public-
     process_id: int = Field(0, alias="pid")
