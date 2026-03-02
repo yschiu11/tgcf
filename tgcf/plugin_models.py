@@ -4,6 +4,10 @@ from pydantic import BaseModel, ConfigDict, Field
 from watermark import Position
 
 
+class TgcfModel(BaseModel):
+    model_config = ConfigDict(populate_by_name=True, validate_assignment=True)
+
+
 class FileType(str, Enum):
     AUDIO = "audio"
     GIF = "gif"
