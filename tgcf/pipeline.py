@@ -8,7 +8,7 @@ from telethon.tl.patched import MessageService
 from tgcf import const
 from tgcf.plugins import apply_plugins
 from tgcf.utils.buffer import AlbumBuffer
-from tgcf.utils.sender import forward_single_message, send_album
+from tgcf.utils.sender import forward_messages_to_dests
 
 
 class MessageHistory:
@@ -103,7 +103,7 @@ class ForwardingPipeline:
 
             return PipelineResult(PipelineStatus.BUFFERED, did_flush=did_flush)
         else:
-            await forward_single_message(wrapped_msg, packet.dest_chats, self.config, self.history.records)
+            await forward_messages_to_dests(self.client, [wrapped_msg], packet.dest_chats, self.config, self.history.records)
             wrapped_msg.clear()
             return PipelineResult(PipelineStatus.SENT, packet.dest_chats, did_flush)
 
@@ -124,10 +124,7 @@ class ForwardingPipeline:
             return
 
         try:
-            if len(messages) > 1:
-                await send_album(self.client, messages, dest_chats, self.config, self.history.records)
-            else:
-                await forward_single_message(messages[0], dest_chats, self.config, self.history.records)
+            await forward_messages_to_dests(self.client, messages, dest_chats, self.config, self.history.records)
         finally:
             for wrapped_msg in messages:
                 wrapped_msg.clear()
@@ -156,7 +153,7 @@ class ForwardingPipeline:
             wrapped_msg.clear()
             return PipelineResult(PipelineStatus.SENT)
 
-        await forward_single_message(wrapped_msg, packet.dest_chats, self.config, self.history.records)
+        await forward_messages_to_dests(self.client, [wrapped_msg], packet.dest_chats, self.config, self.history.records)
         wrapped_msg.clear()
         return PipelineResult(PipelineStatus.SENT)
 
