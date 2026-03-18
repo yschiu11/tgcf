@@ -17,15 +17,6 @@ from tgcf.utils.text import parse_telegram_link
 # Maps (src_chat, src_msg) -> {dest_chat: dest_msg}
 ForwardMap = dict[tuple[int, int], dict[int, int | None]]
 
-def get_delivery_strategies(config: Config) -> list:
-    """Construct the fallback pipeline based on user configuration."""
-    strategies = []
-    if config.show_forwarded_from:
-        strategies.append(strategy_native_forward)
-    strategies.append(strategy_anonymous_copy)
-    strategies.append(strategy_download_upload)
-    return strategies
-
 
 async def forward_messages_to_dests(
     client: TelegramClient,
@@ -40,6 +31,55 @@ async def forward_messages_to_dests(
 
     for dest_chat in dest_chats:
         await dispatch_payload(client, messages, dest_chat, config, history_map)
+
+
+async def forward_by_link(
+    client: TelegramClient,
+    url: str,
+    raw_dests: list[int | str],
+    config: Config,
+) -> None:
+    """Forward a message or album by its Telegram post link.
+
+    Sends as a clean copy (no attribution). Falls back to
+    download+reupload for channels with content protection.
+
+    Args:
+        client: Authenticated Telegram client.
+        url: Telegram post link (``t.me/...``).
+        raw_dests: Destination chat IDs or usernames.
+        config: Global forwarding configuration.
+
+    Raises:
+        ValueError: If the link is invalid or the message is not found.
+    """
+    parsed = parse_telegram_link(url)
+    if not parsed:
+        raise ValueError(f"Invalid Telegram link: {url}")
+
+    channel, src_msg = parsed
+    logging.info(f"Parsed link: channel={channel}, src_msg={src_msg}")
+
+    dest_chats = await resolve_dest_ids(client, raw_dests)
+
+    history_map: ForwardMap = {}
+
+    # Fetch the target message
+    message = await client.get_messages(channel, ids=src_msg)
+    if not message:
+        raise ValueError(f"Message not found: {url}")
+
+    logging.info(f"Fetched message: id={message.id}, grouped_id={message.grouped_id}")
+
+    if message.grouped_id:
+        album_buffer = await fetch_album_by_message(client, channel, src_msg, message.grouped_id)
+        messages = album_buffer.flush()
+    else:
+        wrapped_msg = TgcfMessage(message)
+        wrapped_msg.client = client
+        messages = [wrapped_msg]
+
+    await forward_messages_to_dests(client, messages, dest_chats, config, history_map)
 
 
 async def dispatch_payload(
@@ -84,6 +124,51 @@ async def dispatch_payload(
             logging.info(f"[{strategy.__name__}] failed for dest {dest_chat}: {err}. Trying next fallback...")
 
     logging.error(f"CRITICAL: All delivery strategies exhausted for destination {dest_chat}.")
+
+
+def get_delivery_strategies(config: Config) -> list:
+    """Construct the fallback pipeline based on user configuration."""
+    strategies = []
+    if config.show_forwarded_from:
+        strategies.append(strategy_native_forward)
+    strategies.append(strategy_anonymous_copy)
+    strategies.append(strategy_download_upload)
+    return strategies
+
+
+def get_reply_to_mapping(
+    src_chat: int,
+    reply_msg: int,
+    config: Config,
+    history_map: ForwardMap,
+) -> dict[int, int | None]:
+    """Look up forwarded reply-to IDs for each destination."""
+    if not config.reply_chain:
+        return {}
+
+    reply_src_uid = (src_chat, reply_msg)
+    return history_map.get(reply_src_uid, {})
+
+
+async def resolve_dest_ids(
+    client: TelegramClient,
+    raw_dests: list[int | str],
+) -> list[int]:
+    """Resolve a list of destinations to their numeric chat IDs."""
+    dest_chats: list[int] = []
+    for raw_dest in raw_dests:
+        try:
+            if isinstance(raw_dest, int):
+                dest_chats.append(raw_dest)
+            elif raw_dest.lstrip("-").isdigit():
+                dest_chats.append(int(raw_dest))
+            else:
+                entity = await client.get_entity(raw_dest)
+                dest_chats.append(get_peer_id(entity))
+        except Exception as err:
+            logging.error(f"Failed to resolve destination {raw_dest}: {err}")
+            raise
+    return dest_chats
 
 
 async def strategy_native_forward(
@@ -154,114 +239,3 @@ async def strategy_download_upload(
     finally:
         for file_path in downloaded_files:
             Path(file_path).unlink(missing_ok=True)
-
-
-def get_reply_to_mapping(
-    src_chat: int,
-    reply_msg: int,
-    config: Config,
-    history_map: ForwardMap,
-) -> dict[int, int | None]:
-    """Look up forwarded reply-to IDs for each destination.
-
-    When reply chaining is enabled, maps each destination to the
-    message ID that the reply should point to.
-
-    Args:
-        src_chat: Chat where the original message lives.
-        reply_msg: ID the original message replies to.
-        config: Global configuration (checked for ``reply_chain``).
-        history_map: Forward map with previously sent IDs.
-
-    Returns:
-        Mapping of destination chat ID to reply-to message ID,
-        or empty dict if reply chaining is disabled or no match.
-    """
-    if not config.reply_chain:
-        return {}
-
-    reply_src_uid = (src_chat, reply_msg)
-    return history_map.get(reply_src_uid, {})
-
-
-async def resolve_dest_ids(
-    client: TelegramClient,
-    raw_dests: list[int | str],
-) -> list[int]:
-    """Resolve a list of destinations to their numeric chat IDs.
-
-    Handles three formats:
-    - Integer IDs: Used directly.
-    - String numeric IDs: Converted to int (e.g., "-100123456789").
-    - Usernames: Resolved via Telegram API (e.g., "@channel_name").
-
-    Args:
-        client: Authenticated TelegramClient.
-        raw_dests: List of destination chat IDs or usernames.
-
-    Returns:
-        List of resolved numeric chat IDs.
-    """
-    dest_chats: list[int] = []
-    for raw_dest in raw_dests:
-        try:
-            if isinstance(raw_dest, int):
-                dest_chats.append(raw_dest)
-            elif raw_dest.lstrip("-").isdigit():
-                dest_chats.append(int(raw_dest))
-            else:
-                entity = await client.get_entity(raw_dest)
-                dest_chats.append(get_peer_id(entity))
-        except Exception as err:
-            logging.error(f"Failed to resolve destination {raw_dest}: {err}")
-            raise
-    return dest_chats
-
-
-async def forward_by_link(
-    client: TelegramClient,
-    url: str,
-    raw_dests: list[int | str],
-    config: Config,
-) -> None:
-    """Forward a message or album by its Telegram post link.
-
-    Sends as a clean copy (no attribution). Falls back to
-    download+reupload for channels with content protection.
-
-    Args:
-        client: Authenticated Telegram client.
-        url: Telegram post link (``t.me/...``).
-        raw_dests: Destination chat IDs or usernames.
-        config: Global forwarding configuration.
-
-    Raises:
-        ValueError: If the link is invalid or the message is not found.
-    """
-    parsed = parse_telegram_link(url)
-    if not parsed:
-        raise ValueError(f"Invalid Telegram link: {url}")
-
-    channel, src_msg = parsed
-    logging.info(f"Parsed link: channel={channel}, src_msg={src_msg}")
-
-    dest_chats = await resolve_dest_ids(client, raw_dests)
-
-    history_map: ForwardMap = {}
-
-    # Fetch the target message
-    message = await client.get_messages(channel, ids=src_msg)
-    if not message:
-        raise ValueError(f"Message not found: {url}")
-
-    logging.info(f"Fetched message: id={message.id}, grouped_id={message.grouped_id}")
-
-    if message.grouped_id:
-        album_buffer = await fetch_album_by_message(client, channel, src_msg, message.grouped_id)
-        messages = album_buffer.flush()
-    else:
-        wrapped_msg = TgcfMessage(message)
-        wrapped_msg.client = client
-        messages = [wrapped_msg]
-
-    await forward_messages_to_dests(client, messages, dest_chats, config, history_map)
