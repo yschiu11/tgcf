@@ -3,6 +3,8 @@ from __future__ import annotations
 """Telegram message sending, forwarding, and fallback logic."""
 
 import logging
+from collections.abc import Awaitable, Callable
+from copy import copy
 from pathlib import Path
 
 from telethon.client import TelegramClient
@@ -16,6 +18,11 @@ from tgcf.utils.text import parse_telegram_link
 
 # Maps (src_chat, src_msg) -> {dest_chat: dest_msg}
 ForwardMap = dict[tuple[int, int], dict[int, int | None]]
+
+DeliveryStrategy = Callable[
+    [TelegramClient, list[TgcfMessage], int, int | None],
+    Awaitable[list[Message]],
+ ]
 
 
 async def forward_messages_to_dests(
@@ -79,7 +86,10 @@ async def forward_by_link(
         wrapped_msg.client = client
         messages = [wrapped_msg]
 
-    await forward_messages_to_dests(client, messages, dest_chats, config, history_map)
+    # Force anonymous mode for this context
+    link_config = config.model_copy(update={"show_forwarded_from": False})
+
+    await forward_messages_to_dests(client, messages, dest_chats, link_config, history_map)
 
 
 async def dispatch_payload(
@@ -96,7 +106,7 @@ async def dispatch_payload(
     src_chat = messages[0].message.chat_id
     first_msg = messages[0].message
 
-    reply_to_mapping = {}
+    reply_to_mapping: dict[int, int | None] = {}
     if first_msg.is_reply:
         reply_to_mapping = get_reply_to_mapping(src_chat, first_msg.reply_to_msg_id, config, history_map)
 
@@ -126,9 +136,9 @@ async def dispatch_payload(
     logging.error(f"CRITICAL: All delivery strategies exhausted for destination {dest_chat}.")
 
 
-def get_delivery_strategies(config: Config) -> list:
+def get_delivery_strategies(config: Config) -> list[DeliveryStrategy]:
     """Construct the fallback pipeline based on user configuration."""
-    strategies = []
+    strategies: list[DeliveryStrategy] = []
     if config.show_forwarded_from:
         strategies.append(strategy_native_forward)
     strategies.append(strategy_anonymous_copy)
@@ -200,7 +210,7 @@ async def strategy_anonymous_copy(
         media = msg.new_file if msg.new_file else msg.message.media
         if media:
             files.append(media)
-        captions.append(msg.text or "")
+            captions.append(msg.text or "")
 
     if files:
         res = await client.send_file(dest_chat, files, caption=captions, reply_to=reply_to)
@@ -228,7 +238,7 @@ async def strategy_download_upload(
             file_path = await msg.message.download_media("")
             if file_path:
                 downloaded_files.append(file_path)
-        captions.append(msg.text or "")
+                captions.append(msg.text or "")
 
     if not downloaded_files:
         raise ValueError("No media to download for fallback, or download failed.")
