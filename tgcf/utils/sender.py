@@ -117,10 +117,12 @@ async def dispatch_payload(
             if len(dest_api_msgs) != len(messages):
                 logging.error(f"Size mismatch in {strategy.__name__}: expected {len(messages)}, got {len(dest_api_msgs)}")
 
+            bulk_rows = []
             for src_msg, dest_msg in zip(messages, dest_api_msgs):
                 if not dest_msg:
                     continue
-                history_store.set_sent_id(src_chat, src_msg.message.id, dest_chat, dest_msg.id)
+                bulk_rows.append((src_chat, src_msg.message.id, dest_chat, dest_msg.id))
+            history_store.set_sent_ids(bulk_rows)
 
             return
 
