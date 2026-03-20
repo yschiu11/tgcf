@@ -6,37 +6,11 @@ from telethon.tl.custom.message import Message
 from telethon.tl.patched import MessageService
 
 from tgcf import const
+from tgcf.history import HistoryStore
 from tgcf.plugins import apply_plugins
 from tgcf.utils.buffer import AlbumBuffer
 from tgcf.utils.sender import forward_messages_to_dests
 
-
-class MessageHistory:
-    def __init__(self):
-        self.records: dict[tuple[int, int], dict[int, int | None]] = {}
-
-    def add_placeholder(self, src_chat: int, src_msg: int, dest_chats: list[int]):
-        src_uid = (src_chat, src_msg)
-        if src_uid not in self.records:
-            self.records[src_uid] = {}
-
-        for dest_chat in dest_chats:
-            self.records[src_uid][dest_chat] = None
-
-    def set_sent_id(self, src_chat: int, src_msg: int, dest_chat: int, dest_msg: int):
-        src_uid = (src_chat, src_msg)
-        if src_uid not in self.records:
-            self.records[src_uid] = {}
-
-        self.records[src_uid][dest_chat] = dest_msg
-
-    def get_dest_msg(self, src_chat: int, src_msg: int, dest_chat: int) -> int | None:
-        src_uid = (src_chat, src_msg)
-        return self.records.get(src_uid, {}).get(dest_chat)
-
-    def prune(self, limit: int):
-        while len(self.records) > limit:
-            self.records.pop(next(iter(self.records)))
 
 @dataclass
 class MessagePacket:
@@ -59,10 +33,11 @@ class PipelineResult:
 
 
 class ForwardingPipeline:
-    def __init__(self, client, config, history):
+    def __init__(self, client, config, history: HistoryStore):
         self.client = client
         self.config = config
         self.history = history
+        self._msg_count = 0
         # map: src_chat -> (Buffer, DestChats)
         self.buffers: dict[int, tuple[AlbumBuffer, list[int]]] = {}
 
@@ -77,7 +52,9 @@ class ForwardingPipeline:
         if isinstance(api_msg, MessageService):
             return PipelineResult(PipelineStatus.IGNORED)
 
-        self.history.prune(const.KEEP_LAST_MANY)
+        self._msg_count += 1
+        if self._msg_count % 100 == 0:
+            self.history.prune(const.KEEP_LAST_MANY)
 
         wrapped_msg = await apply_plugins(api_msg, self.config.plugins)
         if not wrapped_msg:
@@ -103,7 +80,7 @@ class ForwardingPipeline:
 
             return PipelineResult(PipelineStatus.BUFFERED, did_flush=did_flush)
         else:
-            await forward_messages_to_dests(self.client, [wrapped_msg], packet.dest_chats, self.config, self.history.records)
+            await forward_messages_to_dests(self.client, [wrapped_msg], packet.dest_chats, self.config, self.history)
             wrapped_msg.clear()
             return PipelineResult(PipelineStatus.SENT, packet.dest_chats, did_flush)
 
@@ -124,7 +101,7 @@ class ForwardingPipeline:
             return
 
         try:
-            await forward_messages_to_dests(self.client, messages, dest_chats, self.config, self.history.records)
+            await forward_messages_to_dests(self.client, messages, dest_chats, self.config, self.history)
         finally:
             for wrapped_msg in messages:
                 wrapped_msg.clear()
@@ -137,8 +114,7 @@ class ForwardingPipeline:
         if not wrapped_msg:
             return PipelineResult(PipelineStatus.IGNORED)
 
-        src_uid = (src_chat, api_msg.id)
-        dest_map = self.history.records.get(src_uid)
+        dest_map = self.history.get_dest_map(src_chat, api_msg.id)
 
         if dest_map:
             for dest_chat, dest_msg in dest_map.items():
@@ -153,14 +129,13 @@ class ForwardingPipeline:
             wrapped_msg.clear()
             return PipelineResult(PipelineStatus.SENT)
 
-        await forward_messages_to_dests(self.client, [wrapped_msg], packet.dest_chats, self.config, self.history.records)
+        await forward_messages_to_dests(self.client, [wrapped_msg], packet.dest_chats, self.config, self.history)
         wrapped_msg.clear()
         return PipelineResult(PipelineStatus.SENT)
 
     async def handle_delete(self, src_chat: int, deleted_ids: list[int]) -> PipelineResult:
         for src_msg in deleted_ids:
-            src_uid = (src_chat, src_msg)
-            dest_map = self.history.records.get(src_uid)
+            dest_map = self.history.get_dest_map(src_chat, src_msg)
             if dest_map:
                 for dest_chat, dest_msg in dest_map.items():
                     if dest_msg is None:

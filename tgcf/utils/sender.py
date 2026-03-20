@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable
-from copy import copy
 from pathlib import Path
 
 from telethon.client import TelegramClient
@@ -12,12 +11,10 @@ from telethon.tl.custom.message import Message
 from telethon.utils import get_peer_id
 
 from tgcf.config import Config
+from tgcf.history import HistoryStore, MemoryHistoryStore
 from tgcf.plugins import TgcfMessage
 from tgcf.utils.buffer import fetch_album_by_message
 from tgcf.utils.text import parse_telegram_link
-
-# Maps (src_chat, src_msg) -> {dest_chat: dest_msg}
-ForwardMap = dict[tuple[int, int], dict[int, int | None]]
 
 DeliveryStrategy = Callable[
     [TelegramClient, list[TgcfMessage], int, int | None],
@@ -30,14 +27,14 @@ async def forward_messages_to_dests(
     messages: list[TgcfMessage],
     dest_chats: list[int],
     config: Config,
-    history_map: ForwardMap,
+    history_store: HistoryStore,
 ) -> None:
     """Entry point for forwarding messages to multiple destinations."""
     if not messages:
         return
 
     for dest_chat in dest_chats:
-        await dispatch_payload(client, messages, dest_chat, config, history_map)
+        await dispatch_payload(client, messages, dest_chat, config, history_store)
 
 
 async def forward_by_link(
@@ -69,7 +66,7 @@ async def forward_by_link(
 
     dest_chats = await resolve_dest_ids(client, raw_dests)
 
-    history_map: ForwardMap = {}
+    history_store = MemoryHistoryStore()
 
     # Fetch the target message
     message = await client.get_messages(channel, ids=src_msg)
@@ -89,7 +86,7 @@ async def forward_by_link(
     # Force anonymous mode for this context
     link_config = config.model_copy(update={"show_forwarded_from": False})
 
-    await forward_messages_to_dests(client, messages, dest_chats, link_config, history_map)
+    await forward_messages_to_dests(client, messages, dest_chats, link_config, history_store)
 
 
 async def dispatch_payload(
@@ -97,7 +94,7 @@ async def dispatch_payload(
     messages: list[TgcfMessage],
     dest_chat: int,
     config: Config,
-    history_map: ForwardMap,
+    history_store: HistoryStore,
 ) -> None:
     """Route a payload through the delivery pipeline until success."""
     if not messages:
@@ -108,7 +105,7 @@ async def dispatch_payload(
 
     reply_to_mapping: dict[int, int | None] = {}
     if first_msg.is_reply:
-        reply_to_mapping = get_reply_to_mapping(src_chat, first_msg.reply_to_msg_id, config, history_map)
+        reply_to_mapping = get_reply_to_mapping(src_chat, first_msg.reply_to_msg_id, config, history_store)
 
     reply_to = reply_to_mapping.get(dest_chat)
     strategies = get_delivery_strategies(config)
@@ -120,13 +117,12 @@ async def dispatch_payload(
             if len(dest_api_msgs) != len(messages):
                 logging.error(f"Size mismatch in {strategy.__name__}: expected {len(messages)}, got {len(dest_api_msgs)}")
 
+            bulk_rows = []
             for src_msg, dest_msg in zip(messages, dest_api_msgs):
                 if not dest_msg:
                     continue
-                src_uid = (src_chat, src_msg.message.id)
-                if src_uid not in history_map:
-                    history_map[src_uid] = {}
-                history_map[src_uid][dest_chat] = dest_msg.id
+                bulk_rows.append((src_chat, src_msg.message.id, dest_chat, dest_msg.id))
+            history_store.set_sent_ids(bulk_rows)
 
             return
 
@@ -150,14 +146,13 @@ def get_reply_to_mapping(
     src_chat: int,
     reply_msg: int,
     config: Config,
-    history_map: ForwardMap,
+    history_store: HistoryStore,
 ) -> dict[int, int | None]:
     """Look up forwarded reply-to IDs for each destination."""
     if not config.reply_chain:
         return {}
 
-    reply_src_uid = (src_chat, reply_msg)
-    return history_map.get(reply_src_uid, {})
+    return history_store.get_dest_map(src_chat, reply_msg)
 
 
 async def resolve_dest_ids(
