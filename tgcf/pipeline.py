@@ -37,6 +37,7 @@ class ForwardingPipeline:
         self.client = client
         self.config = config
         self.history = history
+        self._msg_count = 0
         # map: src_chat -> (Buffer, DestChats)
         self.buffers: dict[int, tuple[AlbumBuffer, list[int]]] = {}
 
@@ -51,7 +52,9 @@ class ForwardingPipeline:
         if isinstance(api_msg, MessageService):
             return PipelineResult(PipelineStatus.IGNORED)
 
-        self.history.prune(const.KEEP_LAST_MANY)
+        self._msg_count += 1
+        if self._msg_count % 100 == 0:
+            self.history.prune(const.KEEP_LAST_MANY)
 
         wrapped_msg = await apply_plugins(api_msg, self.config.plugins)
         if not wrapped_msg:
